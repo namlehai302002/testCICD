@@ -90,7 +90,7 @@ public class AccountControllerTests
 
         var result = await controller.Login(new LoginViewModel
         {
-            UserName = "wrong",
+            UserName = "wrong11",
             Password = "123"
         });
 
