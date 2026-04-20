@@ -159,7 +159,7 @@ public class AccountControllerTests
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal("Login", redirect.ActionName);
+        Assert.Equal("WRONG_PAGE", redirect.ActionName);
 
         Assert.Single(db.AppUsers);
     }
