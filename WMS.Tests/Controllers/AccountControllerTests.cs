@@ -194,7 +194,7 @@ public void Login_SampleData_ShouldMatchOrFail()
 
     // ================= INPUT (NGƯỜI DÙNG NHẬP) =================
     var inputUser = "hieu2";
-    var inputPass = "Wms@1234!"; // đổi thành sai để test FAIL
+    var inputPass = "Wms@123455!"; // đổi thành sai để test FAIL
 
     // ================= LOGIC SO KHỚP =================
     bool isMatch =
