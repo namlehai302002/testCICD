@@ -1,0 +1,45 @@
+name: .NET CI/CD (WMS)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Checkout code
+    - name: Checkout source
+      uses: actions/checkout@v4
+
+    # 2. Setup .NET 8
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    # 3. Restore
+    - name: Restore dependencies
+      run: dotnet restore WMS.sln
+
+    # 4. Build
+    - name: Build
+      run: dotnet build WMS.sln --no-restore --configuration Release
+
+    # 5. Test + Coverage
+    - name: Run Unit Tests
+      run: |
+        dotnet test WMS.Tests/WMS.Tests.csproj \
+        --no-build \
+        --configuration Release \
+        --collect:"XPlat Code Coverage"
+
+    # 6. Upload coverage report
+    - name: Upload Test Results
+      uses: actions/upload-artifact@v4
+      with:
+        name: TestResults
+        path: WMS.Tests/TestResults
