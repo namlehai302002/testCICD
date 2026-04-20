@@ -1,0 +1,122 @@
+@model List<WMS.Models.UnitOfMeasure>
+@{ ViewData["Title"] = "Đơn Vị Tính"; }
+
+@functions {
+    public string GetUomGroup(string code)
+    {
+        code = code.ToLower().Trim();
+        var mass = new[] { "kg", "g", "mg", "tấn", "lạng", "yến", "tạ" };
+        var vol = new[] { "l", "ml", "m³", "cm³", "gal" };
+        var length = new[] { "m", "cm", "mm", "km", "in", "ft" };
+        var area = new[] { "m²", "cm²" };
+        var time = new[] { "giờ", "ngày", "tháng", "năm", "phút", "giây", "mili giây" };
+        var commerce = new[] { "cái", "chiếc", "bộ", "đôi", "cặp", "con", "tờ", "cuộn", "thanh", "ống", "viên", "gói", "túi", "chai", "lon", "lọ", "hũ", "bình", "can", "xô" };
+        var pack = new[] { "thùng", "hộp", "bao", "kiện", "pallet", "lô", "két", "khay", "bịch" };
+
+        if (mass.Contains(code)) return "Khối lượng";
+        if (vol.Contains(code)) return "Thể tích";
+        if (length.Contains(code)) return "Độ dài";
+        if (area.Contains(code)) return "Diện tích";
+        if (time.Contains(code)) return "Thời gian";
+        if (pack.Contains(code)) return "Đóng gói";
+        return "Thương mại"; // default cho các loại đếm được
+    }
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Đơn Vị Tính (UOM)</h1>
+        <p class="page-subtitle">Quản lý ĐVT cơ sở và quy đổi</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><span class="card-title">Danh sách ĐVT Cơ Bản</span></div>
+    <div class="card-body">
+        <div class="user-guide" style="margin-bottom:10px;">
+            <div class="user-guide-title"><i class="fas fa-ruler"></i> Thêm đơn vị tính đúng chuẩn</div>
+            <div class="step-list">
+                <span class="step-chip"><i class="fas fa-keyboard"></i> Nhập mã ngắn gọn, dễ nhớ (VD: KG, PCS, L)</span>
+                <span class="step-chip"><i class="fas fa-pen"></i> Nhập tên đầy đủ để người dùng mới dễ hiểu</span>
+            </div>
+        </div>
+
+        <form method="post" action="/Units/Create" id="uomCreateForm" novalidate style="display:flex; gap:10px; margin-bottom:6px; align-items:flex-start; flex-wrap:wrap;">
+            @Html.AntiForgeryToken()
+            <div style="width:140px;">
+                <input type="text" id="uomCodeInput" name="uomCode" class="form-control" placeholder="Mã (VD: KG)" />
+                <small id="uomCodeError" class="text-danger" style="display:none; font-size:11px;">Vui lòng nhập mã ĐVT.</small>
+            </div>
+            <div style="min-width:240px; flex:1;">
+                <input type="text" id="uomNameInput" name="uomName" class="form-control" placeholder="Tên (VD: Kilogram)" />
+                <small id="uomNameError" class="text-danger" style="display:none; font-size:11px;">Vui lòng nhập tên ĐVT.</small>
+            </div>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Thêm</button>
+        </form>
+        <div class="text-muted" style="font-size:11px; margin-bottom:12px;">Lỗi nhập liệu sẽ hiển thị ngay dưới ô tương ứng.</div>
+        
+        <div class="table-container flat">
+            <table>
+                <thead><tr><th>Mã ĐVT</th><th>Tên ĐVT</th><th>Nhóm</th><th style="width:60px;"></th></tr></thead>
+                <tbody>
+                    @foreach(var u in Model.OrderBy(x => GetUomGroup(x.UomCode)).ThenBy(x => x.UomCode))
+                    {
+                        <tr>
+                            <td class="td-code text-accent">@u.UomCode</td>
+                            <td class="td-name">@u.UomName</td>
+                            <td><span class="badge badge-purple">@GetUomGroup(u.UomCode)</span></td>
+                            <td>
+                                <form asp-controller="Units" asp-action="Delete" asp-route-id="@u.UomId" method="post" onsubmit="return confirm('Xóa ĐVT này?')">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const uomForm = document.getElementById('uomCreateForm');
+    if (uomForm) {
+        uomForm.addEventListener('submit', function (e) {
+            const code = document.getElementById('uomCodeInput');
+            const name = document.getElementById('uomNameInput');
+            const codeErr = document.getElementById('uomCodeError');
+            const nameErr = document.getElementById('uomNameError');
+
+            const codeVal = (code?.value || '').trim();
+            const nameVal = (name?.value || '').trim();
+            let hasError = false;
+
+            if (!codeVal) {
+                hasError = true;
+                if (codeErr) codeErr.style.display = 'block';
+                if (code) code.classList.add('input-validation-error');
+            } else {
+                if (codeErr) codeErr.style.display = 'none';
+                if (code) code.classList.remove('input-validation-error');
+            }
+
+            if (!nameVal) {
+                hasError = true;
+                if (nameErr) nameErr.style.display = 'block';
+                if (name) name.classList.add('input-validation-error');
+            } else {
+                if (nameErr) nameErr.style.display = 'none';
+                if (name) name.classList.remove('input-validation-error');
+            }
+
+            if (hasError) {
+                e.preventDefault();
+                if (!codeVal && code) code.focus();
+                else if (name) name.focus();
+            }
+        });
+    }
+</script>
+}

@@ -1,0 +1,232 @@
+<!-- Camera Scanner Modal Partial -->
+<div class="modal-overlay" id="scannerModal">
+    <div class="modal" style="max-width:500px;">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fas fa-camera"></i> Quét Mã Vạch Bằng Camera</div>
+            <button class="modal-close" onclick="closeScannerModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body text-center">
+            <div id="reader" style="width:100%; min-height:300px; border:2px solid transparent; transition: border-color 0.3s;"></div>
+            <p id="scanStatus" style="font-size:13px; color:var(--accent); margin-top:8px; font-weight:600; display:none;"></p>
+            <p id="scanDebug" style="font-size:11px; color:#999; margin-top:4px; display:none;"></p>
+            <div style="margin-top:10px; padding:8px; border-top:1px solid rgba(255,255,255,0.1);">
+                <p style="font-size:11px; color:#888; margin-bottom:6px;">Camera không đọc được? Nhập mã vạch bằng tay:</p>
+                <div style="display:flex; gap:6px;">
+                    <input type="text" id="manualBarcodeInput" class="form-control" placeholder="Nhập số mã vạch..." style="flex:1; font-size:14px;" />
+                    <button type="button" class="btn btn-sm btn-primary" onclick="submitManualBarcode()" style="white-space:nowrap;">
+                        <i class="fas fa-search"></i> Tìm
+                    </button>
+                </div>
+            </div>
+            <p class="text-muted mt-2" style="font-size:12px;">Đưa mã vạch/QR Code vào giữa khung hình. Hỗ trợ Code128, EAN-13, QR Code...</p>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" type="text/javascript"></script>
+<script>
+    let _html5QrCode = null;
+    let _onScanSuccessCallback = null;
+    let _scanLock = false;
+    let _scanAttempts = 0;
+
+    // Supported barcode formats - MUST be in constructor, NOT in start() config
+    const _supportedFormats = [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.DATA_MATRIX,
+        Html5QrcodeSupportedFormats.ITF,
+        Html5QrcodeSupportedFormats.CODABAR
+    ];
+
+    function openScannerModal(onSuccess) {
+        _onScanSuccessCallback = onSuccess;
+        _scanLock = false;
+        _scanAttempts = 0;
+        document.getElementById('scannerModal').classList.add('active');
+
+        const statusEl = document.getElementById('scanStatus');
+        if (statusEl) { statusEl.style.display = 'none'; statusEl.textContent = ''; }
+        const debugEl = document.getElementById('scanDebug');
+        if (debugEl) { debugEl.style.display = 'none'; debugEl.textContent = ''; }
+
+        if (_html5QrCode) return; // Already running
+
+        console.log('[Scanner] Initializing with formats:', _supportedFormats.length);
+
+        // FIX: formatsToSupport MUST go in the constructor, not in start() config
+        _html5QrCode = new Html5Qrcode("reader", {
+            formatsToSupport: _supportedFormats,
+            verbose: false
+        });
+
+        const config = {
+            fps: 10,
+            qrbox: function(viewfinderWidth, viewfinderHeight) {
+                // Wider scan box for 1D barcodes - use most of the width
+                let w = Math.min(viewfinderWidth * 0.9, 400);
+                let h = Math.min(viewfinderHeight * 0.5, 200);
+                return { width: Math.floor(w), height: Math.floor(h) };
+            },
+            // Do NOT set aspectRatio - let camera use native ratio for max resolution
+            experimentalFeatures: { useBarCodeDetectorIfSupported: false },
+            rememberLastUsedCamera: true,
+            showTorchButtonIfSupported: true,
+            disableFlip: false
+        };
+
+        // Check HTTPS requirement
+        const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+        if (!isSecure) {
+            const statusEl = document.getElementById('scanStatus');
+            if (statusEl) {
+                statusEl.innerHTML = '⚠ <strong>Cần HTTPS</strong> để dùng camera trên thiết bị di động.<br>Trang hiện tại đang dùng HTTP, camera có thể bị chặn bởi trình duyệt.';
+                statusEl.style.display = 'block';
+                statusEl.style.color = 'var(--danger, #e53e3e)';
+            }
+            console.warn('[Scanner] Page is NOT served over HTTPS. Camera access may be blocked on mobile.');
+        }
+
+        _html5QrCode.start(
+            { facingMode: "environment" },
+            config,
+            (decodedText, decodedResult) => {
+                if (_scanLock) return;
+                _scanLock = true;
+
+                const formatName = decodedResult?.result?.format?.formatName || 'Unknown';
+                console.log('[Scanner] Decoded:', decodedText, 'Format:', formatName);
+
+                // Beep
+                try { new Audio('https://www.soundjay.com/buttons/sounds/beep-07a.mp3').play().catch(()=>{}); } catch(e){}
+
+                // Visual flash
+                const reader = document.getElementById('reader');
+                if (reader) {
+                    reader.style.borderColor = '#10b981';
+                    setTimeout(() => reader.style.borderColor = 'transparent', 800);
+                }
+
+                // Show scanned text
+                const statusEl = document.getElementById('scanStatus');
+                if (statusEl) {
+                    statusEl.textContent = '✓ Đã quét: ' + decodedText + ' (' + formatName + ')';
+                    statusEl.style.display = 'block';
+                    statusEl.style.color = 'var(--accent, #10b981)';
+                }
+
+                if (_onScanSuccessCallback) {
+                    // Wrap callback - always reset scanLock afterwards so user can scan again
+                    Promise.resolve(_onScanSuccessCallback(decodedText, decodedResult))
+                        .then(() => {
+                            // Reset lock after 1.5 seconds to allow scanning another item
+                            setTimeout(() => { _scanLock = false; }, 1500);
+                        })
+                        .catch((err) => {
+                            console.error('[Scanner] Callback error:', err);
+                            _scanLock = false;
+                        });
+                } else {
+                    // No callback, reset lock after delay
+                    setTimeout(() => { _scanLock = false; }, 1500);
+                }
+            },
+            (errorMessage) => {
+                // Show scan attempts so user knows it's working
+                _scanAttempts++;
+                if (_scanAttempts % 30 === 0) { // Update every ~3 seconds (fps=10)
+                    const debugEl = document.getElementById('scanDebug');
+                    if (debugEl) {
+                        debugEl.textContent = `Đang tìm mã vạch... (${_scanAttempts} frame đã quét). Giữ điện thoại cách mã vạch ~15cm.`;
+                        debugEl.style.display = 'block';
+                    }
+                }
+            }
+        ).then(() => {
+            console.log('[Scanner] Camera started successfully');
+            const debugEl = document.getElementById('scanDebug');
+            if (debugEl) {
+                debugEl.textContent = 'Camera đang hoạt động... Đưa mã vạch vào khung hình.';
+                debugEl.style.display = 'block';
+            }
+        }).catch((err) => {
+            console.error("[Scanner] Camera start error:", err);
+            const statusEl = document.getElementById('scanStatus');
+            if (statusEl) {
+                let errorMsg = '⚠ Không mở được camera.';
+                if (err.toString().includes('NotAllowedError')) {
+                    errorMsg = '⚠ Bạn đã chặn quyền camera. Vào Settings trình duyệt → cho phép Camera.';
+                } else if (err.toString().includes('NotFoundError')) {
+                    errorMsg = '⚠ Không tìm thấy camera trên thiết bị này.';
+                } else if (err.toString().includes('NotReadableError')) {
+                    errorMsg = '⚠ Camera đang được ứng dụng khác sử dụng.';
+                } else if (!isSecure) {
+                    errorMsg = '⚠ Trang web cần HTTPS để truy cập camera. Liên hệ quản trị để bật SSL/HTTPS.';
+                }
+                statusEl.innerHTML = errorMsg;
+                statusEl.style.display = 'block';
+                statusEl.style.color = 'var(--danger, #e53e3e)';
+            }
+        });
+    }
+
+    function closeScannerModal() {
+        document.getElementById('scannerModal').classList.remove('active');
+        _scanLock = false; // Always reset lock when closing
+        if (_html5QrCode) {
+            _html5QrCode.stop().then(() => {
+                _html5QrCode.clear();
+                _html5QrCode = null;
+                console.log('[Scanner] Camera stopped and cleared.');
+            }).catch(e => {
+                console.error('[Scanner] Stop error:', e);
+                _html5QrCode = null;
+            });
+        }
+    }
+
+    // Backward compatible alias
+    function toggleWebcamScanner(onSuccess) { openScannerModal(onSuccess); }
+
+    // Manual barcode input fallback
+    function submitManualBarcode() {
+        const input = document.getElementById('manualBarcodeInput');
+        const barcode = input?.value?.trim();
+        if (!barcode) return;
+        input.value = '';
+        
+        console.log('[Scanner] Manual barcode submitted:', barcode);
+        
+        if (_onScanSuccessCallback) {
+            // Call the same callback as camera scan
+            Promise.resolve(_onScanSuccessCallback(barcode, null))
+                .then(() => {
+                    const statusEl = document.getElementById('scanStatus');
+                    if (statusEl) {
+                        statusEl.textContent = '✓ Đã gửi mã: ' + barcode;
+                        statusEl.style.display = 'block';
+                        statusEl.style.color = 'var(--accent, #10b981)';
+                    }
+                })
+                .catch(err => console.error('[Scanner] Manual submit error:', err));
+        }
+    }
+
+    // Enter key support for manual input
+    document.addEventListener('DOMContentLoaded', function() {
+        const manualInput = document.getElementById('manualBarcodeInput');
+        if (manualInput) {
+            manualInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    submitManualBarcode();
+                }
+            });
+        }
+    });
+</script>

@@ -1,0 +1,319 @@
+@model DashboardViewModel
+@{ ViewData["Title"] = "Trang chính"; }
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Trang chính</h1>
+        <p class="page-subtitle">Tổng quan công việc kho nội bộ cho nhân viên</p>
+    </div>
+    <div class="page-actions">
+        <a href="/Vouchers/Create?type=1" class="btn btn-primary"><i class="fas fa-plus"></i> Nhập Kho</a>
+        <a href="/Vouchers/Create?type=2" class="btn btn-secondary"><i class="fas fa-minus"></i> Xuất Kho</a>
+        <a href="/Warehouses/InventoryMap" class="btn btn-outline-primary"><i class="fas fa-th"></i> Sơ Đồ Kho</a>
+    </div>
+</div>
+
+<div class="user-guide">
+    <div class="user-guide-title"><i class="fas fa-compass"></i> Bắt đầu nhanh cho người mới</div>
+    <div class="step-list">
+        <span class="step-chip"><i class="fas fa-plus"></i> Bước 1: Tạo phiếu Nhập/Xuất</span>
+        <span class="step-chip"><i class="fas fa-check-double"></i> Bước 2: Duyệt hoặc xác nhận tạo nhiệm vụ lấy hàng</span>
+        <span class="step-chip"><i class="fas fa-file-export"></i> Bước 3: Xem báo cáo tồn kho</span>
+    </div>
+</div>
+
+@if (User.IsInRole("Staff"))
+{
+    <div class="card mb-2">
+        <div class="card-header">
+            <span class="card-title"><i class="fas fa-bolt text-accent"></i> Thao tác nhanh cho nhân viên kho</span>
+        </div>
+        <div class="card-body">
+            <div class="step-list">
+                <a href="/Vouchers/Create?type=1" class="btn btn-primary"><i class="fas fa-arrow-down"></i> Tạo phiếu nhập</a>
+                <a href="/Vouchers/Create?type=2" class="btn btn-secondary"><i class="fas fa-arrow-up"></i> Tạo phiếu xuất nội bộ</a>
+                <a href="/Reports/Inventory" class="btn btn-outline-primary"><i class="fas fa-box-open"></i> Xem tồn kho hiện tại</a>
+                <a href="/Vouchers" class="btn btn-secondary"><i class="fas fa-list"></i> Tra cứu phiếu đã tạo</a>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="stats-grid">
+    <div class="stat-card accent">
+        <div class="stat-icon"><i class="fas fa-boxes-stacked"></i></div>
+        <div class="stat-value">@Model.TotalItems</div>
+        <div class="stat-label">Tổng Vật Tư</div>
+    </div>
+    <div class="stat-card success">
+        <div class="stat-icon"><i class="fas fa-coins"></i></div>
+        <div class="stat-value">@Model.TotalStockValue.ToString("N0")</div>
+        <div class="stat-label">Giá Trị Tồn Kho (VNĐ)</div>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div>
+        <div class="stat-value">@Model.LowStockCount</div>
+        <div class="stat-label">Sắp Hết Hàng</div>
+    </div>
+    <div class="stat-card purple">
+        <div class="stat-icon"><i class="fas fa-file-invoice"></i></div>
+        <div class="stat-value">@Model.TodayVouchers</div>
+        <div class="stat-label">Phiếu Hôm Nay</div>
+    </div>
+    <div class="stat-card info">
+        <div class="stat-icon"><i class="fas fa-layer-group"></i></div>
+        <div class="stat-value">@Model.OpenWaves</div>
+        <div class="stat-label">Đợt lấy hàng đang mở</div>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-icon"><i class="fas fa-list-check"></i></div>
+        <div class="stat-value">@Model.OpenPickTasks</div>
+        <div class="stat-label">Nhiệm vụ lấy hàng chưa xong</div>
+    </div>
+    <div class="stat-card danger">
+        <div class="stat-icon"><i class="fas fa-circle-exclamation"></i></div>
+        <div class="stat-value">@Model.ShortPickTasks</div>
+        <div class="stat-label">Lấy thiếu hàng</div>
+    </div>
+    <div class="stat-card success">
+        <div class="stat-icon"><i class="fas fa-percent"></i></div>
+        <div class="stat-value">@Model.ReservationFillRate.ToString("N1")%</div>
+        <div class="stat-label">Tỷ lệ đáp ứng giữ chỗ</div>
+    </div>
+</div>
+
+<div class="grid-2 mb-3">
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title"><i class="fas fa-chart-bar text-accent"></i> Phiếu Theo Loại (30 ngày)</span>
+        </div>
+        <div class="card-body">
+            <div class="chart-container"><canvas id="voucherChart"></canvas></div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title"><i class="fas fa-chart-pie text-accent"></i> Tồn Kho Theo Danh Mục</span>
+        </div>
+        <div class="card-body">
+            <div class="chart-container"><canvas id="stockChart"></canvas></div>
+        </div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title"><i class="fas fa-triangle-exclamation text-warning"></i> Cảnh Báo Tồn Kho Thấp</span>
+            <a href="/Items?stockStatus=low" class="btn btn-sm btn-secondary">Xem tất cả</a>
+        </div>
+        <div class="table-container flat">
+            <table>
+                <thead><tr><th>Mã</th><th>Tên</th><th>Tồn Kho</th><th>Tối Thiểu</th><th>Trạng Thái</th></tr></thead>
+                <tbody>
+                    @if (Model.LowStockItems.Any())
+                    {
+                        @foreach (var item in Model.LowStockItems)
+                        {
+                            <tr>
+                                <td class="td-code">@item.ItemCode</td>
+                                <td class="td-name">@item.ItemName</td>
+                                <td class="td-number">@item.CurrentStock.ToString("N0")</td>
+                                <td class="td-number">@item.MinThreshold.ToString("N0")</td>
+                                <td>
+                                    @if (item.CurrentStock <= 0)
+                                    { <span class="badge badge-danger">Hết Hàng</span> }
+                                    else
+                                    { <span class="badge badge-warning">Sắp Hết</span> }
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr><td colspan="5" class="text-center text-muted" style="padding:30px;">Không có cảnh báo</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header" style="flex-wrap: wrap; gap: 10px;">
+            <span class="card-title" style="flex:1; min-width: 150px;"><i class="fas fa-clock text-accent"></i> Phiếu Gần Đây</span>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                <input type="text" id="voucherSearch" class="form-control" style="width:160px; height:30px; font-size:13px; padding: 4px 10px;" placeholder="🔍 Tìm mã phiếu...">
+                <select id="voucherTypeFilter" class="form-control" style="width:140px; height:30px; font-size:13px; padding: 4px 10px;">
+                    <option value="">Tất cả loại</option>
+                    <option value="Nhập Kho">Nhập Kho</option>
+                    <option value="Xuất Kho">Xuất Kho</option>
+                </select>
+            </div>
+        </div>
+        <div class="table-container flat">
+            <table>
+                <thead><tr><th>Mã Phiếu</th><th>Loại</th><th>Kho</th><th>Ngày</th><th>Trạng Thái</th><th style="width:40px;"></th></tr></thead>
+                <tbody id="recentVouchersBody">
+                    @foreach (var v in Model.RecentVouchers)
+                    {
+                        <tr class="voucher-row">
+                            <td class="v-code"><a href="/Vouchers/Details/@v.VoucherId" class="td-code" style="text-decoration:none;">@v.VoucherCode</a></td>
+                            <td class="v-type"><span class="badge badge-soft-info">@v.VoucherTypeName</span></td>
+                            <td>@v.Warehouse?.WarehouseName</td>
+                            <td>@v.VoucherDate.ToString("dd/MM/yyyy")</td>
+                            <td><span class="badge @v.StatusBadgeClass">@v.StatusDisplay</span></td>
+                            <td><a href="/Vouchers/Details/@v.VoucherId" class="btn btn-sm btn-ghost" title="Xem Phiếu Này"><i class="fas fa-external-link-alt"></i></a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@if (User.IsInRole("Admin"))
+{
+    <div class="card mt-3">
+        <div class="card-header" style="flex-wrap: wrap; gap: 10px;">
+            <span class="card-title" style="flex:1; min-width: 150px;"><i class="fas fa-bell text-warning"></i> Cảnh Báo Gần Đây</span>
+            <a href="/Reports/Alerts" class="btn btn-sm btn-secondary">Mở trang Cảnh báo</a>
+        </div>
+        <div class="table-container flat">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:140px;">Loại</th>
+                        <th>Mã</th>
+                        <th>Tên vật tư</th>
+                        <th style="text-align:right;">SL/Ngưỡng</th>
+                        <th style="width:160px;">Thời gian</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.UnresolvedAlerts != null && Model.UnresolvedAlerts.Any())
+                    {
+                        foreach (var a in Model.UnresolvedAlerts)
+                        {
+                            var badge = a.AlertType switch
+                            {
+                                1 => "badge-warning",
+                                2 => "badge-info",
+                                3 => "badge-danger",
+                                _ => "badge-secondary"
+                            };
+                            var sub = a.AlertType == 3
+                                ? $"{a.CurrentStock:N2} (<= {(int)a.Threshold} ngày)"
+                                : $"{a.CurrentStock:N2} / {a.Threshold:N2}";
+                            <tr>
+                                <td><span class="badge @badge">@a.AlertTypeName</span></td>
+                                <td class="td-code text-accent">@a.Item?.ItemCode</td>
+                                <td class="td-name">@a.Item?.ItemName</td>
+                                <td class="td-number">@sub</td>
+                                <td>@a.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr><td colspan="5" class="text-center text-muted" style="padding:30px;">Không có cảnh báo</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@section Scripts {
+<script>
+    const vLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.VouchersByType.Keys));
+    const vData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.VouchersByType.Values));
+    const sLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.StockByCategory.Keys));
+    const sData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.StockByCategory.Values));
+
+    const colors = ['#06b6d4','#6366f1','#10b981','#f59e0b','#ef4444','#a855f7','#ec4899','#14b8a6'];
+
+    new Chart(document.getElementById('voucherChart'), {
+        type: 'bar',
+        data: {
+            labels: vLabels,
+            datasets: [{ data: vData, backgroundColor: colors.slice(0, vLabels.length), borderRadius: 6, borderSkipped: false }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { color: '#8b95b0', font: { size: 11 } }, grid: { display: false } },
+                y: { ticks: { color: '#8b95b0' }, grid: { color: 'rgba(42,48,80,0.5)' } }
+            }
+        }
+    });
+
+    new Chart(document.getElementById('stockChart'), {
+        type: 'doughnut',
+        data: {
+            labels: sLabels,
+            datasets: [{ data: sData, backgroundColor: colors.slice(0, sLabels.length), borderWidth: 0 }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { color: '#8b95b0', padding: 12, font: { size: 11 } } }
+            },
+            cutout: '65%'
+        }
+    });
+
+    // Client-side filtering for Recent Vouchers
+    function filterRecentVouchers() {
+        try {
+            const searchPhrase = document.getElementById('voucherSearch').value.toLowerCase().trim();
+            const typeFilter = document.getElementById('voucherTypeFilter').value.toLowerCase();
+            const rows = document.querySelectorAll('#recentVouchersBody .voucher-row');
+            
+            let hasVisible = false;
+            rows.forEach(row => {
+                const codeNode = row.querySelector('.v-code');
+                const typeNode = row.querySelector('.v-type');
+                if (!codeNode || !typeNode) return;
+
+                const code = codeNode.textContent.toLowerCase();
+                const pType = typeNode.textContent.toLowerCase();
+                
+                const matchesSearch = searchPhrase === '' || code.includes(searchPhrase);
+                const matchesType = typeFilter === '' || pType.includes(typeFilter);
+                
+                if (matchesSearch && matchesType) {
+                    row.style.display = '';
+                    hasVisible = true;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            // Handle empty state
+            let emptyRow = document.getElementById('recentVouchersEmpty');
+            if (!hasVisible) {
+                if (!emptyRow) {
+                    const tbody = document.getElementById('recentVouchersBody');
+                    emptyRow = document.createElement('tr');
+                    emptyRow.id = 'recentVouchersEmpty';
+                    emptyRow.innerHTML = '<td colspan="6" class="text-center text-muted" style="padding: 20px;">Không tìm thấy kết quả phù hợp</td>';
+                    tbody.appendChild(emptyRow);
+                }
+                emptyRow.style.display = '';
+            } else if (emptyRow) {
+                emptyRow.style.display = 'none';
+            }
+        } catch (e) {
+            console.error("Filter error:", e);
+        }
+    }
+
+    // Attach events using event listeners instead of inline to avoid scoping issues
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('voucherSearch');
+        const typeSelect = document.getElementById('voucherTypeFilter');
+        if (searchInput) searchInput.addEventListener('input', filterRecentVouchers);
+        if (typeSelect) typeSelect.addEventListener('change', filterRecentVouchers);
+    });
+</script>
+}

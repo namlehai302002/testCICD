@@ -1,0 +1,1594 @@
+@model WMS.ViewModels.VoucherCreateViewModel
+@{ 
+    string typeName = Model.VoucherType switch { 
+        1 => "Nhập Kho", 2 => "Xuất Kho", 3 => "Trả NCC", 4 => "Khách Trả", 5 => "Điều Chỉnh", 6 => "Chuyển Kho", 7 => "Nhập TP", 8 => "Xuất SX", _ => "" 
+    };
+    ViewData["Title"] = $"Tạo Phiếu {typeName}"; 
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Thêm Mới Phiếu @typeName</h1>
+        <p class="page-subtitle">Nhập chính xác đầy đủ thông tin để ghi nhận vào hệ thống</p>
+    </div>
+    <a href="/Vouchers" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Quay lại</a>
+</div>
+
+<div class="user-guide">
+    <div class="user-guide-title"><i class="fas fa-circle-info"></i> Hướng dẫn nhanh</div>
+    <div class="step-list">
+        <span class="step-chip"><i class="fas fa-building"></i> 1) Kiểm tra kho và đối tác</span>
+        <span class="step-chip"><i class="fas fa-box"></i> 2) Chọn vật tư, nhập số lượng</span>
+        <span class="step-chip"><i class="fas fa-save"></i> 3) Bấm lưu để tạo phiếu</span>
+    </div>
+</div>
+@if (Model.VoucherType == 6)
+{
+    <div class="user-guide" style="margin-top:8px;">
+        <div class="user-guide-title"><i class="fas fa-lightbulb"></i> Cách hiểu nhanh phiếu chuyển kho</div>
+        <div style="font-size:13px; color:var(--text-muted);">
+            <b>Số lượng thực chuyển</b> = <b>Số lượng xuất</b> x <b>Quy đổi ra đơn vị tồn</b>.
+            Ví dụ: xuất 2 Bộ, quy đổi 10 Cái/Bộ => hệ thống chuyển tồn 20 Cái.
+        </div>
+    </div>
+}
+
+<form action="/Vouchers/Create" method="post" id="voucherForm" novalidate>
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="VoucherType" value="@Model.VoucherType" />
+    <input type="hidden" name="ParentVoucherId" value="@Model.ParentVoucherId" />
+    <div asp-validation-summary="All" class="alert alert-danger" style="margin-bottom:20px; display:none;" id="validationSummary"></div>
+
+    @if (Model.VoucherType == 2)
+    {
+        <input type="hidden" name="ExportMode" id="ExportMode" value="1" />
+    }
+
+    <div class="card mb-3">
+        <div class="card-header"><span class="card-title">Thông Tin Chung</span></div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Ngày Chứng Từ</label>
+                    <input type="text" class="form-control" value="@DateTime.UtcNow.ToString("dd/MM/yyyy")" disabled />
+                </div>
+                @if(Model.VoucherType == 2)
+                {
+                    <div class="form-group">
+                        <label class="form-label">Loại xuất</label>
+                        <select id="exportModeSelect" class="form-control" onchange="setExportMode(parseInt(this.value))">
+                            <option value="1" selected>Xuất nội bộ</option>
+                            <option value="2">Xuất bán / ra ngoài</option>
+                        </select>
+                    </div>
+                }
+                <input type="hidden" name="WarehouseId" value="@(Model.WarehouseId > 0 ? Model.WarehouseId : Model.Warehouses.FirstOrDefault()?.WarehouseId)" />
+                @if(Model.VoucherType == 6)
+                {
+                    <div class="form-group">
+                        <label class="form-label">Kho Đích *</label>
+                        <select name="DestWarehouseId" class="form-control" required
+                                oninvalid="this.setCustomValidity('Vui lòng chọn kho đích.')"
+                                onchange="this.setCustomValidity('')"
+                                oninput="this.setCustomValidity('')">
+                            <option value="">-- Chọn kho đích --</option>
+                            @foreach (var w in Model.Warehouses.Where(x => x.IsActive))
+                            {
+                                <option value="@w.WarehouseId" selected="@(w.WarehouseId == Model.DestWarehouseId ? "selected" : null)">
+                                    [@w.WarehouseCode] @w.WarehouseName
+                                </option>
+                            }
+                        </select>
+                    </div>
+                }
+                
+                @if(Model.VoucherType is 1 or 2 or 3 or 4)
+                {
+                    <div class="form-group" id="partnerFieldDiv">
+                        <label class="form-label" asp-for="PartnerId">Đối Tác (NCC / Khách Hàng) *</label>
+                        <select name="PartnerId" class="form-control" required
+                                oninvalid="this.setCustomValidity('Vui lòng chọn đối tác (NCC/Khách hàng).')"
+                                onchange="this.setCustomValidity('')"
+                                oninput="this.setCustomValidity('')">
+                            <option value="">-- Trống / Chọn Đối Tác --</option>
+                            @foreach(var p in Model.Partners) { 
+                                <option value="@p.PartnerId" selected="@(p.PartnerId == Model.PartnerId ? "selected" : null)">
+                                    [@p.PartnerCode] @p.PartnerName
+                                </option> 
+                            }
+                        </select>
+                        <span asp-validation-for="PartnerId" class="text-danger" style="font-size:12px;"></span>
+                    </div>
+                }
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Số Chứng Từ Gốc</label>
+                    <input type="text" name="ReferenceNo" class="form-control" placeholder="VD: INVOICE-123" />
+                </div>
+                <div class="form-group" style="grid-column: span 2;">
+                    <label class="form-label">Diễn giải / Ghi chú</label>
+                    <input type="text" name="Description" class="form-control" placeholder="Mục đích nhập/xuất" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:300px;">
+                <span class="card-title" style="white-space:nowrap;">Chi Tiết Vật Tư</span>
+                <div style="position:relative; flex:1; max-width:350px;">
+                    <i class="fas fa-barcode" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--accent); font-size:16px;"></i>
+                    <input type="text" id="barcodeInput" class="form-control" autocomplete="off" 
+                           placeholder="Quét mã vạch hoặc nhập mã vật tư + Enter" 
+                           style="padding-left:36px; border:2px solid var(--accent); font-size:15px; font-weight:500; letter-spacing:0.5px;" 
+                           />
+                    <span id="scannerLed" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); width:10px; height:10px; border-radius:50%; background:#10b981; box-shadow:0 0 6px #10b981; animation: ledPulse 2s infinite;"></span>
+                </div>
+                <span id="scanCount" class="badge" style="background:var(--accent); color:#fff; padding:4px 10px; border-radius:12px; font-size:12px; display:none;">0 đã quét</span>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="toggleWebcamScanner()"><i class="fas fa-camera"></i> Camera</button>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <label class="btn btn-sm btn-info" style="margin:0; cursor:pointer;" id="uploadBillBtn">
+                    <i class="fas fa-magic"></i> Quét Hóa Đơn AI
+                    <input type="file" id="billFileInput" accept="image/*" multiple style="display:none;" />
+                </label>
+                <label class="btn btn-sm btn-secondary" style="margin:0; cursor:pointer;" id="importExcelBtn">
+                    <i class="fas fa-file-import"></i> Nhập Excel
+                    <input type="file" id="excelFileInput" accept=".xlsx" style="display:none;" />
+                </label>
+                <a class="btn btn-sm btn-ghost" href="/Vouchers/DownloadImportTemplate" title="Tải file mẫu Excel để nhập nhanh">
+                    <i class="fas fa-download"></i> File mẫu
+                </a>
+                <a class="btn btn-sm btn-ghost" href="/Vouchers/DownloadDemoImport100" title="Tải file Excel demo 100 dòng (dùng để thuyết trình)">
+                    <i class="fas fa-database"></i> Demo 100 dòng
+                </a>
+                <button type="button" class="btn btn-sm btn-primary" onclick="addRow()"><i class="fas fa-plus"></i> Thêm Dòng</button>
+            </div>
+        </div>
+        <!-- Scan toast notification -->
+        <div id="scanToast" style="display:none; padding:8px 16px; font-size:13px; font-weight:600; text-align:center; transition:all 0.3s;"></div>
+        <div class="table-container flat">
+            <table id="linesTable" style="table-layout:fixed; width:100%;">
+                <thead>
+                    <tr>
+                        <th style="width:50px; text-align:center;">#</th>
+                        <th style="width:32%;">Vật Tư / Hàng Hóa *</th>
+                        <th style="width:14%;">Đơn vị xuất</th>
+                        <th style="width:12%;">Số lượng xuất *</th>
+                        @if (Model.VoucherType is 1 or 4 or 7 or 6)
+                        {
+                            <th style="width:12%;">Số lô</th>
+                        }
+                        @if (Model.VoucherType == 6)
+                        {
+                            <th style="width:16%;">Lấy từ vị trí *</th>
+                            <th style="width:16%;">Chuyển đến vị trí *</th>
+                        }
+                        @if (Model.VoucherType == 5)
+                        {
+                            <th style="width:12%;">Điều chỉnh</th>
+                        }
+                        @* Removed SL lỗi/thiếu column for simpler UX *@
+                        <th style="width:14%;">Đơn vị tồn kho</th>
+                        <th style="width:12%;">Quy đổi ra đơn vị tồn</th>
+                        <th class="price-col" style="width:14%;">Đơn Giá (VNĐ)</th>
+                        <th style="width:40px; text-align:center; padding:0;"></th>
+                    </tr>
+                </thead>
+                <tbody id="linesContainer">
+                    @{
+                        if (Model.Lines == null || !Model.Lines.Any())
+                        {
+                            Model.Lines = new List<WMS.ViewModels.VoucherDetailLine> { new WMS.ViewModels.VoucherDetailLine { DefectQty = 0, TransactionQty = 0, UnitPrice = 0 } };
+                        }
+                    }
+                    @for (int i = 0; i < Model.Lines.Count; i++)
+                    {
+                        var line = Model.Lines[i];
+                        <tr class="line-row">
+                            <td class="line-no text-center text-muted fw-700">@(i + 1)</td>
+                            <td>
+                                <select name="Lines[@i].ItemId" class="form-control item-select" required onchange="itemChanged(this)">
+                                    <option value="">-- Chọn Vật Tư --</option>
+                                    @foreach(var item in Model.Items) { 
+                                        <option value="@item.ItemId" 
+                                                data-uom="@item.BaseUomId" 
+                                                data-uom-code="@item.BaseUom?.UomCode"
+                                                data-cost="@item.UnitCost.ToString(System.Globalization.CultureInfo.InvariantCulture)" 
+                                                data-default-loc="@item.DefaultLocationId"
+                                                data-item-type="@item.ItemType"
+                                                selected="@(item.ItemId == line.ItemId ? "selected" : null)">
+                                            [@item.ItemCode] @item.ItemName
+                                        </option> 
+                                    }
+                                </select>
+                            </td>
+                            <td>
+                                <select name="Lines[@i].TransactionUomId" class="form-control source-uom-select" onchange="sourceUomChanged(this)">
+                                    <option value="">-- Chọn đơn vị xuất --</option>
+                                    @foreach(var u in Model.Uoms) { 
+                                        <option value="@u.UomId" 
+                                                selected="@(u.UomId == line.TransactionUomId ? "selected" : null)">
+                                            @u.UomCode - @u.UomName
+                                        </option> 
+                                    }
+                                </select>
+                            </td>
+                            <td>
+                                <input type="text" name="Lines[@i].TransactionQty" class="form-control text-right qty-input" required value="@(line.TransactionQty > 0 ? line.TransactionQty.ToString("N0") : "")" oninput="formatAndCalc(this)" />
+                            </td>
+                            @if (Model.VoucherType is 1 or 4 or 7 or 6)
+                            {
+                                <td>
+                                    <input type="text" name="Lines[@i].LotNumber" class="form-control" value="@line.LotNumber" placeholder="VD: LOT-123" />
+                                </td>
+                            }
+                            @if (Model.VoucherType == 6)
+                            {
+                                <td>
+                                    <select name="Lines[@i].LocationId" class="form-control loc-select" required>
+                                        <option value="">-- Chọn vị trí lấy hàng --</option>
+                                        @foreach (var loc in Model.Locations.Where(l => l.IsActive))
+                                        {
+                                            <option value="@loc.LocationId" selected="@(loc.LocationId == line.LocationId ? "selected" : null)">
+                                                @loc.LocationCode
+                                            </option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="Lines[@i].DestLocationId" class="form-control dest-loc-select" required>
+                                        <option value="">-- Chọn vị trí nhận hàng --</option>
+                                        @foreach (var loc in Model.Locations.Where(l => l.IsActive))
+                                        {
+                                            <option value="@loc.LocationId" selected="@(loc.LocationId == line.DestLocationId ? "selected" : null)">
+                                                @loc.LocationCode
+                                            </option>
+                                        }
+                                    </select>
+                                </td>
+                            }
+                            @if (Model.VoucherType == 5)
+                            {
+                                <td>
+                                    <select name="Lines[@i].AdjustSign" class="form-control" style="font-weight:700;">
+                                        <option value="1" selected="@(line.AdjustSign == 1 ? "selected" : null)">Tăng</option>
+                                        <option value="-1" selected="@(line.AdjustSign == -1 ? "selected" : null)">Giảm</option>
+                                    </select>
+                                </td>
+                            }
+                            @* Removed SL lỗi/thiếu input *@
+                            <td>
+                                <select class="form-control dest-uom-select" disabled>
+                                    <option value="">-- Đơn vị tồn kho --</option>
+                                    @foreach(var u in Model.Uoms) { 
+                                        <option value="@u.UomId">@u.UomCode - @u.UomName</option> 
+                                    }
+                                </select>
+                            </td>
+                            <td>
+                                <input type="text" name="Lines[@i].DestQty" class="form-control text-right dest-qty-input" style="font-weight:700; color:var(--accent);" oninput="formatCommaInput(this)" />
+                                @* For non-transfer vouchers, LocationId is handled via hidden field (auto/default/suggestion). *@
+                                @if (Model.VoucherType != 6)
+                                {
+                                    <input type="hidden" name="Lines[@i].LocationId" class="loc-input" value="@line.LocationId" />
+                                }
+                            </td>
+                            <input type="hidden" name="Lines[@i].DefectQty" value="0" />
+                            <td class="price-col">
+                                <input type="text" name="Lines[@i].UnitPrice" class="form-control text-right cost-input" value="@(Model.VoucherType == 1 || Model.VoucherType == 8 ? "0" : line.UnitPrice.ToString("N0"))" @(Model.VoucherType == 1 || Model.VoucherType == 8 ? "readonly" : "") oninput="formatAndPrice(this)" />
+                            </td>
+                            <td style="text-align:center; vertical-align:middle; padding:0 4px;">
+                                <button type="button" class="btn-delete-row" onclick="deleteRow(this)" title="Xóa dòng">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </td>
+
+                        </tr>
+                    }
+                </tbody>
+
+            </table>
+        </div>
+    </div>
+
+    <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px;">
+        <button type="submit" class="btn btn-success btn-lg" id="submitBtn"><i class="fas fa-check"></i> Lưu phiếu</button>
+    </div>
+</form>
+
+<partial name="_ScannerModal" />
+
+
+@section Scripts {
+<style>
+    /* ===== Table layout: fill all columns evenly ===== */
+    #linesTable { table-layout: fixed; width: 100%; }
+    #linesTable td { padding: 6px 5px; vertical-align: middle; overflow: hidden; }
+    #linesTable td .form-control,
+    #linesTable td .select2-container { width: 100% !important; box-sizing: border-box; }
+    #linesTable .line-row { transition: background 0.15s ease; }
+    #linesTable .line-row:hover { background: rgba(255,255,255,0.02); }
+
+    /* Hide number input arrows (spinners) */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { 
+        -webkit-appearance: none; 
+        margin: 0; 
+    }
+    input[type=number] {
+        -moz-appearance: textfield;
+    }
+
+    .alert-danger:empty { display: none !important; }
+    .d-none { display: none !important; }
+    .price-col { transition: all 0.2s ease; }
+    @@keyframes ledPulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+    }
+    @@keyframes scanFlash {
+        0% { background: rgba(16, 185, 129, 0.15); }
+        100% { background: transparent; }
+    }
+    @@keyframes scanFlashError {
+        0% { background: rgba(229, 62, 62, 0.15); }
+        100% { background: transparent; }
+    }
+    #barcodeInput:focus {
+        border-color: var(--accent) !important;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25) !important;
+    }
+    .scan-row-highlight {
+        animation: scanFlash 1s ease-out;
+    }
+    /* Delete row button — compact circle */
+    .btn-delete-row {
+        width: 26px;
+        height: 26px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(239, 68, 68, 0.08);
+        border: 1px solid rgba(239, 68, 68, 0.2);
+        color: #f87171;
+        font-size: 12px;
+        cursor: pointer;
+        border-radius: 50%;
+        transition: all 0.25s cubic-bezier(.4,0,.2,1);
+        opacity: 0.5;
+        padding: 0;
+    }
+    .line-row:hover .btn-delete-row {
+        opacity: 0.85;
+    }
+    .btn-delete-row:hover {
+        opacity: 1;
+        background: rgba(239, 68, 68, 0.2);
+        border-color: #ef4444;
+        color: #ef4444;
+        transform: scale(1.15);
+        box-shadow: 0 0 10px rgba(239, 68, 68, 0.25);
+    }
+    .btn-delete-row:active {
+        transform: scale(0.9);
+    }
+</style>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<style>
+    /* Select2 Light Theme Match */
+    .select2-container--default .select2-selection--single {
+        background-color: #fff !important;
+        border: 1px solid var(--border, #d7e1ee) !important;
+        height: 38px !important;
+        border-radius: 8px !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        color: var(--text-primary, #1f2937) !important;
+        line-height: normal !important;
+        padding-left: 12px !important;
+        font-weight: 500;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 100% !important;
+        right: 8px !important;
+    }
+    
+    /* Dropdown body */
+    .select2-dropdown {
+        background-color: #fff !important;
+        border: 1px solid var(--border, #d7e1ee) !important;
+        color: var(--text-primary, #1f2937) !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12) !important;
+    }
+    .select2-container--default .select2-results__option {
+        color: var(--text-primary, #1f2937) !important;
+    }
+    .select2-container--default .select2-results__option[aria-selected=true] {
+        background-color: rgba(14, 165, 233, 0.15) !important;
+        color: var(--text-primary, #1f2937) !important;
+    }
+    .select2-container--default .select2-results__option--highlighted[aria-selected] {
+        background-color: rgba(14, 165, 233, 0.25) !important;
+        color: var(--text-primary, #1f2937) !important;
+    }
+    /* Search box inside dropdown */
+    .select2-search--dropdown .select2-search__field {
+        background-color: #fff !important;
+        border: 1px solid var(--border, #d7e1ee) !important;
+        color: var(--text-primary, #1f2937) !important;
+        border-radius: 4px !important;
+        padding: 6px 10px !important;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__clear {
+        color: #e53e3e !important;
+        right: 25px !important;
+        position: relative !important;
+        font-weight: bold !important;
+    }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+    function initSelect2() {
+        $('.item-select, .source-uom-select, select[name="PartnerId"]').select2({
+            width: '100%',
+            dropdownAutoWidth: true
+        });
+        
+        // Fix for Select2 search input focus inside modals or elements
+        $(document).on('select2:open', () => {
+            document.querySelector('.select2-search__field').focus();
+        });
+    }
+
+    $(document).ready(function() {
+        initSelect2();
+    });
+    // === COMMA FORMATTING UTILITIES ===
+    function parseCommaNumber(str) {
+        if (!str) return 0;
+        return parseFloat(str.toString().replace(/,/g, '')) || 0;
+    }
+    function formatWithCommas(num) {
+        if (num === '' || num === null || num === undefined) return '';
+        var n = parseFloat(num.toString().replace(/,/g, ''));
+        if (isNaN(n)) return '';
+        // Preserve decimals if present
+        var parts = num.toString().replace(/,/g, '').split('.');
+        var intPart = parseInt(parts[0]) || 0;
+        var formatted = intPart.toLocaleString('en-US');
+        if (parts.length > 1) formatted += '.' + parts[1];
+        return formatted;
+    }
+    function formatCommaInput(input) {
+        var cursorPos = input.selectionStart;
+        var oldLen = input.value.length;
+        var raw = input.value.replace(/[^0-9.\-]/g, '');
+        input.value = formatWithCommas(raw);
+        var newLen = input.value.length;
+        input.selectionStart = input.selectionEnd = cursorPos + (newLen - oldLen);
+    }
+    function formatAndCalc(input) {
+        formatCommaInput(input);
+        sourceQtyChanged(input);
+    }
+    function formatAndPrice(input) {
+        formatCommaInput(input);
+        priceChanged(input);
+    }
+    // Strip commas before form submission so server gets clean numbers
+    document.addEventListener('DOMContentLoaded', function() {
+        var form = document.getElementById('voucherForm');
+        if (form) {
+            // Normalize quantity inputs to avoid culture traps.
+            // Rule of thumb:
+            // - If there are 3 digits after a single separator => treat as thousands (1,000 => 1000)
+            // - If there are 1-2 digits after a single separator => treat as decimal (10.50 => 10.5)
+            function normalizeQtyForPost(val) {
+                if (!val) return '';
+                let s = val.toString().trim();
+                if (!s) return '';
+                // keep digits, dot, comma, minus
+                s = s.replace(/[^0-9.,\-]/g, '');
+                if (!s) return '';
+
+                const hasDot = s.indexOf('.') >= 0;
+                const hasComma = s.indexOf(',') >= 0;
+                let normalized = s;
+
+                if (hasDot && hasComma) {
+                    // If both exist, assume the last one is decimal separator
+                    const lastDot = s.lastIndexOf('.');
+                    const lastComma = s.lastIndexOf(',');
+                    const decIsDot = lastDot > lastComma;
+                    if (decIsDot) normalized = s.replace(/,/g, '');
+                    else normalized = s.replace(/\./g, '').replace(',', '.');
+                } else if (hasDot || hasComma) {
+                    const sep = hasDot ? '.' : ',';
+                    const parts = s.split(sep);
+                    if (parts.length > 2) {
+                        // multiple separators => thousands
+                        normalized = s.replace(/[.,]/g, '');
+                    } else {
+                        const frac = parts[1] ?? '';
+                        if (frac.length === 3) {
+                            // 1,000 or 1.000 => thousands
+                            normalized = s.replace(/[.,]/g, '');
+                        } else if (frac.length === 0) {
+                            normalized = parts[0];
+                        } else if (frac.length <= 2) {
+                            // decimal
+                            normalized = parts[0] + '.' + frac;
+                        } else {
+                            // ambiguous long fraction -> treat as thousands to be safe
+                            normalized = s.replace(/[.,]/g, '');
+                        }
+                    }
+                }
+
+                normalized = normalized.replace(/(?!^)-/g, '');
+                const n = parseFloat(normalized);
+                if (isNaN(n)) return '';
+                return n.toString();
+            }
+            form.addEventListener('submit', function() {
+                // Quantities: normalize aggressively
+                form.querySelectorAll('.qty-input, .dest-qty-input, .defect-input').forEach(function(inp) {
+                    inp.value = normalizeQtyForPost(inp.value);
+                });
+                // Prices: keep old behavior (commas only) to preserve meaning of "10.000" = 10k if user ever types dots
+                form.querySelectorAll('.cost-input').forEach(function(inp) {
+                    inp.value = inp.value.replace(/,/g, '');
+                });
+            });
+        }
+    });
+    // ============================================================
+    // ENTERPRISE BARCODE SCANNER SYSTEM
+    // Supports: USB/Bluetooth barcode guns, camera scan, manual input
+    // ============================================================
+
+    let lineIdx = @(Model.Lines?.Count ?? 1);
+    let totalScanned = 0;
+
+    // --- WEB AUDIO BEEP (instant, no external dependency) ---
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let _audioCtx = null;
+
+    function playBeep(frequency = 1200, duration = 150, type = 'square') {
+        try {
+            if (!_audioCtx) _audioCtx = new AudioCtx();
+            const osc = _audioCtx.createOscillator();
+            const gain = _audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.value = frequency;
+            gain.gain.value = 0.3;
+            osc.connect(gain);
+            gain.connect(_audioCtx.destination);
+            osc.start();
+            gain.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + duration / 1000);
+            osc.stop(_audioCtx.currentTime + duration / 1000);
+        } catch (e) { /* Audio not supported */ }
+    }
+
+    function beepSuccess() {
+        playBeep(1200, 100, 'square');
+        setTimeout(() => playBeep(1600, 100, 'square'), 120);
+    }
+
+    function beepError() {
+        playBeep(300, 300, 'sawtooth');
+    }
+
+    function beepDuplicate() {
+        playBeep(800, 80, 'square');
+    }
+
+    // --- TOAST NOTIFICATION ---
+    function showScanToast(message, type = 'success') {
+        const toast = document.getElementById('scanToast');
+        if (!toast) return;
+        toast.textContent = message;
+        toast.style.display = 'block';
+        if (type === 'success') {
+            toast.style.background = 'rgba(16, 185, 129, 0.15)';
+            toast.style.color = '#10b981';
+            toast.style.borderBottom = '2px solid #10b981';
+        } else if (type === 'duplicate') {
+            toast.style.background = 'rgba(59, 130, 246, 0.15)';
+            toast.style.color = '#3b82f6';
+            toast.style.borderBottom = '2px solid #3b82f6';
+        } else {
+            toast.style.background = 'rgba(229, 62, 62, 0.15)';
+            toast.style.color = '#e53e3e';
+            toast.style.borderBottom = '2px solid #e53e3e';
+        }
+        clearTimeout(toast._hideTimer);
+        toast._hideTimer = setTimeout(() => { toast.style.display = 'none'; }, 3000);
+    }
+
+    // --- SCAN COUNTER ---
+    function updateScanCount() {
+        totalScanned++;
+        const badge = document.getElementById('scanCount');
+        if (badge) {
+            badge.textContent = totalScanned + ' đã quét';
+            badge.style.display = 'inline-block';
+        }
+    }
+
+    // --- ROW MANAGEMENT ---
+    function refreshLineNumbers() {
+        const rows = document.querySelectorAll('#linesContainer .line-row');
+        rows.forEach((r, idx) => {
+            const cell = r.querySelector('.line-no');
+            if (cell) cell.textContent = (idx + 1).toString();
+        });
+    }
+
+    // Gắn sự kiện cho các dòng có sẵn
+    document.querySelectorAll('.line-row').forEach(row => {
+        const qtyInput = row.querySelector('.qty-input');
+        if (qtyInput) qtyInput.addEventListener('input', function() { formatAndCalc(this); });
+    });
+    refreshLineNumbers();
+
+    // Override addRow để gắn sự kiện cho dòng mới thêm
+    window.addRow = function() {
+        // Hủy select2 trước khi clone để tránh lỗi giao diện
+        $('.item-select, .source-uom-select, select[name="PartnerId"]').each(function() {
+            if ($(this).hasClass("select2-hidden-accessible")) {
+                $(this).select2('destroy');
+            }
+        });
+
+        const tbody = document.getElementById('linesContainer');
+        const newRow = document.querySelector('.line-row').cloneNode(true);
+        newRow.querySelectorAll('[name]').forEach(el => {
+            el.name = el.name.replace(/\[\d+\]/, `[${lineIdx}]`);
+            if (el.tagName === 'INPUT') {
+                if(el.className.includes('loc-input')) el.value = '';
+                else if(el.type === 'hidden') { /* keep hidden defaults */ }
+                else el.value = '';
+            } else if (el.tagName === 'SELECT') {
+                if(el.className.includes('item-select')) el.value = '';
+                if(el.className.includes('source-uom-select')) el.value = '';
+            }
+        });
+        // Reset dest-uom-select (no name attribute)
+        const destUom = newRow.querySelector('.dest-uom-select');
+        if (destUom) destUom.value = '';
+        const destQty = newRow.querySelector('.dest-qty-input');
+        if (destQty) destQty.value = '';
+        
+        // Gắn sự kiện cho dòng mới (with comma formatting)
+        const qtyInput = newRow.querySelector('.qty-input');
+        if (qtyInput) qtyInput.oninput = function() { formatAndCalc(this); };
+        
+        const priceInput = newRow.querySelector('.cost-input');
+        if (priceInput) priceInput.oninput = function() { formatAndPrice(this); };
+        
+        const itemSelect = newRow.querySelector('.item-select');
+        if (itemSelect) itemSelect.onchange = function() { itemChanged(this); };
+        
+        const sourceUomSelect = newRow.querySelector('.source-uom-select');
+        if (sourceUomSelect) sourceUomSelect.onchange = function() { sourceUomChanged(this); };
+        
+        tbody.appendChild(newRow);
+        lineIdx++;
+
+        // Khởi tạo lại select2 cho tất cả
+        initSelect2();
+        refreshLineNumbers();
+    };
+
+    // === DELETE ROW ===
+    window.deleteRow = function(btn) {
+        const row = btn.closest('tr');
+        const tbody = document.getElementById('linesContainer');
+        const rows = tbody.querySelectorAll('.line-row');
+        if (rows.length <= 1) {
+            Swal.fire('Cảnh Báo', 'Phải có ít nhất 1 dòng chi tiết!', 'warning');
+            return;
+        }
+        // Destroy select2 before removing
+        $('.item-select, .source-uom-select').each(function() {
+            if ($(this).hasClass('select2-hidden-accessible')) {
+                $(this).select2('destroy');
+            }
+        });
+        row.remove();
+        // Re-index remaining rows
+        const remainingRows = tbody.querySelectorAll('.line-row');
+        remainingRows.forEach((r, idx) => {
+            r.querySelectorAll('[name]').forEach(el => {
+                el.name = el.name.replace(/\[\d+\]/, `[${idx}]`);
+            });
+        });
+        lineIdx = remainingRows.length;
+        // Reinit select2
+        initSelect2();
+        refreshLineNumbers();
+    };
+
+    function itemChanged(select) {
+        const opt = select.selectedOptions[0];
+        const row = select.closest('tr');
+        if (opt.value) {
+            // Set ĐV Đích = item's base UoM (auto-select, disabled)
+            const destUomSelect = row.querySelector('.dest-uom-select');
+            if (destUomSelect) {
+                destUomSelect.value = opt.dataset.uom || '';
+            }
+            
+            // Default source UoM cũng là base UoM
+            const sourceUomSelect = row.querySelector('.source-uom-select');
+            if (sourceUomSelect && !sourceUomSelect.value) {
+                sourceUomSelect.value = opt.dataset.uom || '';
+            }
+            
+            // Lưu base cost vào row
+            let baseCost = parseFloat(opt.dataset.cost || 0);
+            row.dataset.baseCost = baseCost;
+            
+            // Set initial unit price
+            let initialPrice = baseCost;
+            if (@Model.VoucherType == 2) {
+                const exportMode = document.getElementById('ExportMode')?.value || 1;
+                if (exportMode == 2) initialPrice = baseCost * 1.2;
+                else initialPrice = 0;
+            } else if (@Model.VoucherType == 1 || @Model.VoucherType == 8) {
+                initialPrice = 0;
+            }
+            row.querySelector('.cost-input').value = formatWithCommas(initialPrice.toFixed(0));
+            
+            // Tính SL Đích
+            calculateDestQty(row);
+            
+            const defaultLoc = opt.dataset.defaultLoc;
+            if (defaultLoc && defaultLoc !== "" && defaultLoc !== "0") {
+                const locInput = row.querySelector('.loc-input');
+                if (locInput) {
+                    locInput.value = defaultLoc;
+                }
+            }
+        }
+    }
+    
+    // Khi user thay đổi ĐV Nguồn → tính lại SL Đích
+    function sourceUomChanged(select) {
+        const row = select.closest('tr');
+        calculateDestQty(row);
+    }
+    
+    // Khi user thay đổi SL Nguồn → tính lại SL Đích
+    function sourceQtyChanged(input) {
+        const row = input.closest('tr');
+        calculateDestQty(row);
+    }
+    
+    // SL Đích = hệ số quy đổi, user tự nhập tay (VD: 2 = mỗi đơn vị nguồn = 2 đơn vị đích)
+    // Không tự động thay đổi SL Đích khi SL Nguồn thay đổi
+    function calculateDestQty(row) {
+        // No-op: SL Đích do user tự nhập
+    }
+
+    function priceChanged(input) {
+        const row = input.closest('tr');
+        calculateRowPrice(row);
+    }
+    
+    function calculateRowPrice(row) {
+        const itemSelect = row.querySelector('.item-select');
+        const itemOpt = itemSelect?.selectedOptions[0];
+        if (!itemOpt || !itemOpt.value) return;
+        
+        if (@Model.VoucherType == 8) {
+            row.querySelector('.cost-input').value = '0';
+        } else if (@Model.VoucherType == 2) {
+            const exportMode = document.getElementById('ExportMode')?.value || 1;
+            if (exportMode != 2) {
+                row.querySelector('.cost-input').value = '0';
+            }
+        }
+    }
+    
+    function setExportMode(mode) {
+        if (!document.getElementById('ExportMode')) return;
+        document.getElementById('ExportMode').value = mode;
+
+        // Sync combobox value
+        const exportSelect = document.getElementById('exportModeSelect');
+        if (exportSelect) exportSelect.value = mode;
+
+        const showPrice = mode === 2;
+        document.querySelectorAll('.price-col').forEach(el => el.style.display = showPrice ? 'table-cell' : 'none');
+
+        document.querySelectorAll('.cost-input').forEach(input => {
+            if (showPrice) {
+                input.removeAttribute('readonly');
+                input.value = input.value ? input.value : '0';
+            } else {
+                input.setAttribute('readonly', 'readonly');
+                input.value = '0';
+            }
+        });
+        // Hiện/ẩn đối tác theo loại xuất
+        const partnerDiv = document.getElementById('partnerFieldDiv');
+        if (partnerDiv) partnerDiv.style.display = mode === 2 ? 'block' : 'none';
+    }
+
+    function initializeExportTabs() {
+        if (@Model.VoucherType == 2) {
+            const currentMode = parseInt(document.getElementById('ExportMode')?.value || '1');
+            setExportMode(currentMode);
+        } else if (@Model.VoucherType == 1 || @Model.VoucherType == 8) {
+             // Nhập kho (1) và Xuất SX (8): ẩn đơn giá
+             document.querySelectorAll('.price-col').forEach(el => el.style.display = 'none');
+        } else {
+             document.querySelectorAll('.price-col').forEach(el => el.style.display = 'table-cell');
+        }
+    }
+
+    // --- LỌC VỊ TRÍ XUẤT KHO ---
+    function filterExportLocations(locSelect, itemId) {
+        if (!locSelect || !itemId) return;
+        // Reset trước
+        Array.from(locSelect.options).forEach(opt => { opt.style.display = ''; opt.disabled = false; });
+        fetch(`/Warehouses/GetItemLocations?itemId=${itemId}`)
+            .then(r => r.json())
+            .then(data => {
+                const occupiedIds = data.map(d => d.locationId.toString());
+                Array.from(locSelect.options).forEach(opt => {
+                    if (!opt.value) return;
+                    if (occupiedIds.includes(opt.value)) {
+                        opt.style.display = '';
+                        opt.disabled = false;
+                    } else {
+                        opt.style.display = 'none';
+                        opt.disabled = true;
+                    }
+                });
+                if (occupiedIds.length === 1) {
+                    locSelect.value = occupiedIds[0];
+                } else if (locSelect.value && !occupiedIds.includes(locSelect.value)) {
+                    locSelect.value = '';
+                }
+            })
+            .catch(err => console.error('Lỗi tải vị trí vật tư:', err));
+    }
+
+    // --- LỌC VỊ TRÍ NHẬP KHO (TỐI ĐA 2 VỊ TRÍ) ---
+    function limitImportLocations(locSelect, itemId, defaultLocId) {
+        if (!locSelect || !itemId) return;
+        // Ẩn tất cả option (trừ option mặc định rỗng)
+        Array.from(locSelect.options).forEach(opt => { 
+            if (opt.value !== "") {
+                opt.style.display = 'none';
+                opt.disabled = true;
+            }
+        });
+        
+        fetch(`/Warehouses/GetSuggestedLocations?itemId=${itemId}&qty=1`) // lấy danh sách gợi ý (ưu tiên ô chứa cùng vật tư)
+            .then(r => r.json())
+            .then(data => {
+                let allowedIds = [];
+                // Ưu tiên 1: DefaultLocation
+                if (defaultLocId && defaultLocId !== "0" && defaultLocId !== "") {
+                    allowedIds.push(defaultLocId.toString());
+                }
+                
+                // Lấy thêm từ array gợi ý sao cho tổng số <= 2
+                if (data && data.length > 0) {
+                    for (let i = 0; i < data.length; i++) {
+                        if (allowedIds.length >= 2) break;
+                        let locStr = data[i].locationId.toString();
+                        if (!allowedIds.includes(locStr) && !data[i].hasOtherItem) {
+                            allowedIds.push(locStr);
+                        }
+                    }
+                }
+                
+                // Hiện lại các option trong allowedIds
+                Array.from(locSelect.options).forEach(opt => {
+                    if (opt.value && allowedIds.includes(opt.value)) {
+                        opt.style.display = '';
+                        opt.disabled = false;
+                    }
+                });
+                
+                // Tự động focus defaultLoc nếu có
+                if (defaultLocId && allowedIds.includes(defaultLocId.toString()) && (locSelect.value === "" || locSelect.value !== defaultLocId.toString())) {
+                    locSelect.value = defaultLocId;
+                } else if (allowedIds.length > 0 && locSelect.value === "") {
+                    locSelect.value = allowedIds[0];
+                } else if (locSelect.value && !allowedIds.includes(locSelect.value)) {
+                    locSelect.value = '';
+                }
+            })
+            .catch(err => console.error('Lỗi xử lý vị trí nhập:', err));
+    }
+
+    // --- LOCATION SUGGESTION (REAL DB) ---
+    function openLocationSuggestion(btn) {
+        const row = btn.closest('.line-row');
+        const locSelect = row.querySelector('.loc-select');
+        const itemSelect = row.querySelector('.item-select');
+        const currentLocId = locSelect.value;
+        const qtyRaw = parseCommaNumber(row.querySelector('input[name$=".TransactionQty"]').value);
+        const itemId = itemSelect.value;
+        
+        const packOpt = row.querySelector('.packaging-select')?.selectedOptions[0];
+        const giatri = parseFloat(packOpt?.dataset.giatri || 1);
+        const qty = qtyRaw * giatri;
+        
+        // Get item name
+        const selectedItemOption = itemSelect.options[itemSelect.selectedIndex];
+        const itemName = selectedItemOption.text;
+        
+        if (!itemId || itemId === '') {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire('Thiếu thông tin', 'Vui lòng chọn vật tư trước khi gợi ý vị trí.', 'warning');
+            } else {
+                alert('Vui lòng chọn vật tư trước khi gợi ý vị trí!');
+            }
+            return;
+        }
+        
+        // Create modal
+        let modal = document.getElementById('locationSuggestionModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'locationSuggestionModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:none;z-index:1050;justify-content:center;align-items:center;';
+            document.body.appendChild(modal);
+        }
+        
+        modal.style.display = 'flex';
+        modal.innerHTML = `
+            <div class="loc-suggest-modal">
+                <div class="loc-suggest-header">
+                    <div>
+                        <h5 class="loc-suggest-title">🔍 Gợi Ý Vị Trí</h5>
+                        <p class="loc-suggest-sub">${itemName} — SL: ${qty}</p>
+                    </div>
+                    <button type="button" class="loc-suggest-close" onclick="document.getElementById('locationSuggestionModal').style.display='none'">&times;</button>
+                </div>
+                <div class="loc-suggest-body" style="text-align:center;">
+                    <i class="fas fa-spinner fa-spin" style="font-size:24px;"></i>
+                    <p style="margin:8px 0 0 0;">Đang tải dữ liệu...</p>
+                </div>
+            </div>
+        `;
+        
+        // Fetch real data from API — xuất kho dùng GetItemLocations, nhập kho dùng GetSuggestedLocations
+        const isExport = @(Model.VoucherType == 2 ? "true" : "false");
+        const apiUrl = isExport
+            ? `/Warehouses/GetItemLocations?itemId=${itemId}`
+            : `/Warehouses/GetSuggestedLocations?itemId=${itemId}&qty=${qty}`;
+        fetch(apiUrl)
+            .then(r => r.json())
+            .then(data => {
+                let tableRows = '';
+
+                if (isExport) {
+                    // XUẤT KHO: chỉ hiện ô đang chứa vật tư
+                    if (data && data.length > 0) {
+                        data.forEach(loc => {
+                            const isSelected = loc.locationId.toString() === currentLocId;
+                            // FEFO indicators
+                            let expiryText = '---';
+                            let expiryBadge = '';
+                            if (loc.expiryDate) {
+                                const dt = new Date(loc.expiryDate);
+                                if (!isNaN(dt)) {
+                                    const dd = String(dt.getDate()).padStart(2, '0');
+                                    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+                                    const yyyy = dt.getFullYear();
+                                    expiryText = `${dd}/${mm}/${yyyy}`;
+                                    const today = new Date();
+                                    const daysLeft = Math.ceil((dt - new Date(today.getFullYear(), today.getMonth(), today.getDate())) / (1000 * 60 * 60 * 24));
+                                    if (daysLeft <= 0) {
+                                        expiryBadge = `<span class="chip chip-danger" style="margin-left:6px;">Hết hạn</span>`;
+                                    } else if (daysLeft <= 30) {
+                                        expiryBadge = `<span class="chip chip-warning" style="margin-left:6px;">${daysLeft} ngày</span>`;
+                                    }
+                                }
+                            }
+                            const lotText = loc.lotNumber ? ` <span class="chip chip-info" title="Số lô" style="margin-left:6px; font-size:10px;">Lô: ${loc.lotNumber}</span>` : '';
+                            tableRows += `<tr style="cursor:pointer;transition:all 0.2s;${isSelected ? 'background:rgba(6,182,212,0.12);font-weight:700;' : ''}">
+                                <td>${loc.locationCode}</td>
+                                <td>${loc.zoneName}</td>
+                                <td class="loc-suggest-kpi">${parseFloat(loc.quantity).toLocaleString('vi-VN')}</td>
+                                <td style="white-space:nowrap;">${expiryText}${expiryBadge}${lotText}</td>
+                                <td style="text-align:center;">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectSuggestedLocation(${loc.locationId}, '${loc.locationCode}')">
+                                        <i class="fas fa-check"></i> Chọn
+                                    </button>
+                                </td>
+                            </tr>`;
+                        });
+                    }
+                    if (!tableRows) {
+                        tableRows = '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-muted);font-style:italic;"><i class="fas fa-box-open" style="font-size:28px;display:block;margin-bottom:8px;"></i>Vật tư này chưa có trong ô/vị trí nào!</td></tr>';
+                    }
+                    const contentHtml = `
+                        <div class="loc-suggest-modal">
+                            <div class="loc-suggest-header">
+                                <div>
+                                    <h5 class="loc-suggest-title">📦 Vị Trí Chứa Vật Tư</h5>
+                                    <p class="loc-suggest-sub">${itemName}</p>
+                                </div>
+                                <button type="button" class="loc-suggest-close" onclick="document.getElementById('locationSuggestionModal').style.display='none'">&times;</button>
+                            </div>
+                            <div class="loc-suggest-body">
+                                <table class="loc-suggest-table">
+                                    <thead><tr>
+                                        <th>Ô vị trí</th>
+                                        <th>Khu</th>
+                                        <th>Tồn kho</th>
+                                        <th>HSD (FEFO)</th>
+                                        <th style="text-align:center;">Chọn</th>
+                                    </tr></thead>
+                                    <tbody>${tableRows}</tbody>
+                                </table>
+                            </div>
+                            <div class="loc-suggest-footer">
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('locationSuggestionModal').style.display='none'">Đóng</button>
+                            </div>
+                        </div>
+                    `;
+                    modal.innerHTML = contentHtml;
+                } else {
+                    // NHẬP KHO: hiện ô còn trống / sức chứa
+                    if (data && data.length > 0) {
+                        data.forEach(loc => {
+                            if (loc.hasOtherItem) return;
+                            const isSelected = loc.locationId.toString() === currentLocId;
+                            const fillColor = loc.fillPercent <= 70 ? '#10b981' : loc.fillPercent <= 90 ? '#f59e0b' : '#ef4444';
+                            const starIcon = loc.hasSameItem ? '<span title="Đã chứa cùng vật tư" style="color:#f59e0b;">⭐</span> ' : '';
+                            tableRows += `<tr style="cursor:pointer;transition:all 0.2s;${isSelected ? 'background:rgba(6,182,212,0.12);font-weight:700;' : ''}">
+                                <td>${starIcon}${loc.locationCode}</td>
+                                <td>${loc.zoneName}</td>
+                                <td>${parseFloat(loc.available).toLocaleString('vi-VN')}</td>
+                                <td><div style="display:flex;align-items:center;gap:6px;"><div style="width:60px;height:6px;background:rgba(255,255,255,0.10);border-radius:3px;overflow:hidden;"><div style="width:${loc.fillPercent}%;height:100%;background:${fillColor};"></div></div><span style="font-size:12px;font-weight:700;color:var(--text-secondary);">${loc.fillPercent}%</span></div></td>
+                                <td style="text-align:center;"><button type="button" class="btn btn-sm btn-outline-primary" onclick="selectSuggestedLocation(${loc.locationId}, '${loc.locationCode}')"><i class="fas fa-check"></i> Chọn</button></td>
+                            </tr>`;
+                        });
+                    }
+                    if (!tableRows) { tableRows = '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-muted);font-style:italic;">Không tìm thấy vị trí phù hợp</td></tr>'; }
+                    const bestLoc = data.length > 0 ? data[0] : null;
+                    const contentHtml = `
+                        <div class="loc-suggest-modal">
+                            <div class="loc-suggest-header">
+                                <div>
+                                    <h5 class="loc-suggest-title">🔍 Gợi Ý Vị Trí</h5>
+                                    <p class="loc-suggest-sub">${itemName} — SL: ${qty}</p>
+                                </div>
+                                <button type="button" class="loc-suggest-close" onclick="document.getElementById('locationSuggestionModal').style.display='none'">&times;</button>
+                            </div>
+                            <div class="loc-suggest-body">
+                                <div style="margin-bottom:10px;font-size:12px;color:var(--text-muted);"><span style="color:#f59e0b;">⭐</span> = Ô đã chứa cùng vật tư (ưu tiên cao)</div>
+                                <table class="loc-suggest-table">
+                                    <thead><tr>
+                                        <th>Ô</th>
+                                        <th>Khu</th>
+                                        <th>Còn trống</th>
+                                        <th>% đầy</th>
+                                        <th style="text-align:center;">Chọn</th>
+                                    </tr></thead>
+                                    <tbody>${tableRows}</tbody>
+                                </table>
+                            </div>
+                            <div class="loc-suggest-footer">
+                                ${bestLoc ? `<button type="button" class="btn btn-sm btn-success" onclick="selectSuggestedLocation(${bestLoc.locationId}, '${bestLoc.locationCode}')">📦 Tự động phân bổ</button>` : ''}
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('locationSuggestionModal').style.display='none'">Đóng</button>
+                            </div>
+                        </div>
+                    `;
+                    modal.innerHTML = contentHtml;
+                }
+
+                // Store reference to location select
+                modal.dataset.locSelectName = locSelect.getAttribute('name');
+            })
+            .catch(err => {
+                console.error('Error loading suggestions:', err);
+                modal.innerHTML = `
+                    <div class="loc-suggest-modal" style="padding:40px;text-align:center;">
+                        <i class="fas fa-circle-exclamation" style="font-size:26px; display:block; margin-bottom:10px; color: var(--danger);"></i>
+                        <div class="fw-700" style="margin-bottom:12px;">Lỗi tải dữ liệu gợi ý</div>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('locationSuggestionModal').style.display='none'">Đóng</button>
+                    </div>
+                `;
+            });
+        
+        // Store which loc select we're modifying
+        window._currentLocSelect = locSelect;
+        
+        // Close modal on outside click
+        modal.onclick = (e) => {
+            if (e.target === modal) modal.style.display = 'none';
+        };
+    }
+    
+    function selectSuggestedLocation(locationId, locationCode) {
+        if (window._currentLocSelect) {
+            window._currentLocSelect.value = locationId;
+            validateLocation(window._currentLocSelect);
+        }
+        document.getElementById('locationSuggestionModal').style.display = 'none';
+    }
+
+    function validateLocation(locSelect) {
+        const row = locSelect.closest('tr');
+        const locId = locSelect.value;
+        const itemSelect = row.querySelector('.item-select');
+        const itemId = itemSelect.value;
+        const itemText = itemSelect.selectedOptions[0]?.text.trim() || "Vật tư";
+
+        if (!locId || !itemId) return;
+
+        // 1. Check same-form conflicts
+        let conflictInForm = false;
+        let conflictItemName = "";
+        document.querySelectorAll('.line-row').forEach(otherRow => {
+            if (otherRow === row) return;
+            const otherLocSelect = otherRow.querySelector('.loc-select');
+            const otherItemSelect = otherRow.querySelector('.item-select');
+            
+            if (otherLocSelect && otherLocSelect.value === locId) {
+                if (otherItemSelect.value && otherItemSelect.value !== itemId) {
+                    conflictInForm = true;
+                    // Get name
+                    conflictItemName = otherItemSelect.selectedOptions[0]?.text.trim();
+                }
+            }
+        });
+
+        if (conflictInForm) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire('Xung đột vị trí', `Vị trí ${locSelect.selectedOptions[0].text} đang được dùng để xếp [${conflictItemName}] ở dòng khác trong phiếu này. Tránh xếp chung 2 vật tư vào 1 ô/bồn.`, 'warning');
+            } else {
+                alert(`Xung đột vị trí: Vị trí ${locSelect.selectedOptions[0].text} đang được dùng để xếp [${conflictItemName}] ở dòng khác trong phiếu này.`);
+            }
+            locSelect.value = ''; // Reset
+            return;
+        }
+
+        // 2. Check DB conflicts
+        fetch(`/Warehouses/CheckLocationConflict?locationId=${locId}&itemId=${itemId}`)
+            .then(r => r.json())
+            .then(res => {
+                if (res.conflict) {
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire('Vị trí đã có hàng', `Vị trí ${locSelect.selectedOptions[0].text} đang chứa ${res.conflictItemName}. Không thể xếp [${itemText}] chung vào đây.`, 'error');
+                    } else {
+                        alert(`Vị trí đã có hàng: Vị trí ${locSelect.selectedOptions[0].text} đang chứa ${res.conflictItemName}.`);
+                    }
+                    locSelect.value = ''; // Reset
+                }
+            })
+            .catch(err => console.error(err));
+    }
+
+    // --- FORM SUBMIT ---
+    document.getElementById('voucherForm').addEventListener('submit', function(e) {
+        let isValid = true;
+        
+        // Thêm fallback an toàn trong trường hợp jQuery validation chưa load kịch bản 
+        if (typeof $ !== 'undefined' && $.fn && $.fn.valid) {
+            isValid = $(this).valid();
+        }
+
+        // Custom validation: PartnerId required (đổi tooltip mặc định sang popup đẹp)
+        const requiredPartner = this.querySelector('select[name="PartnerId"][required]');
+        if (requiredPartner && (!requiredPartner.value || requiredPartner.value === "")) {
+            e.preventDefault();
+            if (typeof Swal !== 'undefined') {
+                Swal.fire('Thiếu thông tin', 'Vui lòng chọn Đối Tác (NCC / Khách Hàng) trước khi lưu phiếu.', 'warning');
+            } else {
+                alert('Vui lòng chọn Đối Tác (NCC / Khách Hàng) trước khi lưu phiếu.');
+            }
+            requiredPartner.focus();
+            return;
+        }
+
+        if (isValid) {
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('submitBtn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang Xử Lý...';
+        } else {
+            document.getElementById('validationSummary').style.display = 'block';
+            e.preventDefault();
+        }
+    });
+
+    // ============================================================
+    // BARCODE SCANNER GUN INTEGRATION
+    // USB/Bluetooth scanners act like keyboards:
+    //   1. They "type" the barcode digits rapidly
+    //   2. Then send Enter key
+    //   3. Input field must be focused to receive input
+    // ============================================================
+    initializeExportTabs();
+    const bInput = document.getElementById('barcodeInput');
+
+    // Auto-focus on page load
+    if (bInput) {
+        bInput.focus();
+
+        // Re-focus when clicking anywhere on the page (except other inputs)
+        document.addEventListener('click', function(e) {
+            // Ignore if clicking on select2 search box or select2 elements
+            if (e.target.closest('.select2-container')) return;
+
+            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'BUTTON') {
+                bInput.focus({ preventScroll: true });
+            }
+        });
+
+        // Handle barcode input (Enter key from scanner gun or manual)  
+        bInput.addEventListener('keypress', async function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const barcode = this.value.trim();
+                this.value = '';
+                if (barcode) {
+                    // Flash the LED
+                    const led = document.getElementById('scannerLed');
+                    if (led) {
+                        led.style.background = '#fbbf24';
+                        led.style.boxShadow = '0 0 8px #fbbf24';
+                    }
+                    
+                    await processBarcode(barcode);
+                    
+                    // Reset LED
+                    if (led) {
+                        setTimeout(() => {
+                            led.style.background = '#10b981';
+                            led.style.boxShadow = '0 0 6px #10b981';
+                        }, 500);
+                    }
+                }
+                // Always re-focus for next scan
+                this.focus();
+            }
+        });
+    }
+
+    // --- CORE BARCODE PROCESSING ---
+    async function processBarcode(barcode) {
+        if (!barcode) return false;
+        console.log('[Scanner] Looking up:', barcode);
+
+        try {
+            const res = await fetch(`/Items/GetItemByBarcode?barcode=${encodeURIComponent(barcode)}`);
+            
+            if (res.ok) {
+                const item = await res.json();
+                console.log('[Scanner] ✓ Found:', item.itemCode, item.itemName);
+
+                // Check if already in list → increment quantity
+                let foundRow = null;
+                document.querySelectorAll('.line-row').forEach(row => {
+                    const select = row.querySelector('.item-select');
+                    if (select.value == item.itemId) foundRow = row;
+                });
+
+                if (foundRow) {
+                    // DUPLICATE SCAN → increment qty
+                    const qtyInput = foundRow.querySelector('input[name$=".TransactionQty"]');
+                    const newQty = parseCommaNumber(qtyInput.value) + 1;
+                    qtyInput.value = formatWithCommas(newQty.toString());
+                    
+                    foundRow.classList.remove('scan-row-highlight');
+                    void foundRow.offsetWidth; // Force reflow
+                    foundRow.classList.add('scan-row-highlight');
+
+                    beepDuplicate();
+                    updateScanCount();
+                    showScanToast(`✓ ${item.itemCode} — SL tăng lên ${newQty}`, 'duplicate');
+                    return true;
+                }
+
+                // NEW ITEM → add to table
+                const tbody = document.getElementById('linesContainer');
+                let firstRow = tbody.querySelector('.line-row');
+                let isFirstBlank = firstRow && firstRow.querySelector('.item-select').value === "";
+                
+                let targetRow = isFirstBlank ? firstRow : null;
+                if (!targetRow) {
+                    addRow();
+                    const rows = document.querySelectorAll('.line-row');
+                    targetRow = rows[rows.length - 1];
+                }
+
+                const select = targetRow.querySelector('.item-select');
+                select.value = item.itemId;
+                itemChanged(select); 
+                
+                targetRow.querySelector('input[name$=".TransactionQty"]').value = 1;
+                calculateRowPrice(targetRow);
+
+                // Highlight the new row
+                targetRow.classList.add('scan-row-highlight');
+
+                beepSuccess();
+                updateScanCount();
+                showScanToast(`✓ Đã thêm: [${item.itemCode}] ${item.itemName}`, 'success');
+                return true;
+
+            } else {
+                // NOT FOUND
+                console.warn('[Scanner] ✗ Not found:', barcode);
+                beepError();
+                showScanToast(`✗ Không tìm thấy vật tư với mã: ${barcode}`, 'error');
+                return false;
+            }
+        } catch (err) {
+            console.error('[Scanner] Network error:', err);
+            beepError();
+            showScanToast(`✗ Lỗi kết nối — thử lại`, 'error');
+            return false;
+        }
+    }
+
+    // --- WEBCAM SCANNER (camera on mobile) ---
+    function toggleWebcamScanner() {
+        openScannerModal(async (decodedText) => {
+            console.log('[Camera] Scanned:', decodedText);
+            const success = await processBarcode(decodedText);
+            const statusEl = document.getElementById('scanStatus');
+            if (statusEl) {
+                if (success) {
+                    statusEl.textContent = '✓ Đã thêm: ' + decodedText + ' — Tiếp tục quét...';
+                    statusEl.style.color = 'var(--accent, #10b981)';
+                } else {
+                    statusEl.textContent = '✗ Không tìm thấy: ' + decodedText;
+                    statusEl.style.color = 'var(--danger, #e53e3e)';
+                }
+                statusEl.style.display = 'block';
+            }
+        });
+    }
+
+
+    async function applyMappedItemsToLines(items) {
+        if (!items || items.length === 0) return { newItemNames: [], matchedCount: 0 };
+
+        // Destroy Select2 BEFORE processing to avoid DOM conflicts
+        if (typeof $ !== 'undefined') {
+            $('.item-select, .source-uom-select').each(function() {
+                if ($(this).hasClass('select2-hidden-accessible')) {
+                    $(this).select2('destroy');
+                }
+            });
+        }
+
+        const tbody = document.getElementById('linesContainer');
+        let firstRow = tbody.querySelector('.line-row');
+        let isFirstBlank = firstRow && firstRow.querySelector('.item-select').value === "";
+        let newItemNames = [];
+        let matchedCount = 0;
+
+        items.forEach((item, index) => {
+            let targetRow = null;
+            if (index === 0 && isFirstBlank) {
+                targetRow = firstRow;
+            } else {
+                const newRow = document.querySelector('.line-row').cloneNode(true);
+                newRow.querySelectorAll('[name]').forEach(el => {
+                    el.name = el.name.replace(/\[\d+\]/, `[${lineIdx}]`);
+                    if (el.tagName === 'INPUT') {
+                        if (el.className.includes('loc-input')) el.value = '';
+                        else if (el.type === 'hidden') { /* keep */ }
+                        else el.value = '';
+                    } else if (el.tagName === 'SELECT') {
+                        if (el.className.includes('item-select')) el.value = '';
+                        if (el.className.includes('source-uom-select')) el.value = '';
+                        if (el.className.includes('loc-select')) el.value = '';
+                    }
+                });
+                const destUom = newRow.querySelector('.dest-uom-select');
+                if (destUom) destUom.value = '';
+                const destQty = newRow.querySelector('.dest-qty-input');
+                if (destQty) destQty.value = '';
+                const qtyInput = newRow.querySelector('.qty-input');
+                if (qtyInput) qtyInput.oninput = function() { formatAndCalc(this); };
+                const priceInput = newRow.querySelector('.cost-input');
+                if (priceInput) priceInput.oninput = function() { formatAndPrice(this); };
+                const itemSelect = newRow.querySelector('.item-select');
+                if (itemSelect) itemSelect.onchange = function() { itemChanged(this); };
+                const sourceUomSelect = newRow.querySelector('.source-uom-select');
+                if (sourceUomSelect) sourceUomSelect.onchange = function() { sourceUomChanged(this); };
+                tbody.appendChild(newRow);
+                lineIdx++;
+                targetRow = newRow;
+            }
+
+            const select = targetRow.querySelector('.item-select');
+            let matched = Array.from(select.options).find(o => o.value == item.ItemId);
+            if (!matched) {
+                const newText = `[${item.ItemCode}] ${item.ItemName}`;
+                document.querySelectorAll('.item-select').forEach(sel => {
+                    const opt = new Option(newText, item.ItemId);
+                    opt.dataset.uom = item.BaseUomId || '';
+                    opt.dataset.cost = item.UnitPrice || 0;
+                    sel.add(opt);
+                });
+            }
+
+            select.value = item.ItemId;
+            itemChanged(select);
+
+            if (item.IsNew) newItemNames.push(`[${item.ItemCode}] ${item.ItemName}`);
+            else matchedCount++;
+
+            const qtyVal = (item.Quantity ?? item.quantity ?? 1);
+            targetRow.querySelector('input[name$=".TransactionQty"]').value = formatWithCommas(qtyVal.toString());
+
+            const unitPriceVal = (item.UnitPrice ?? item.unitPrice ?? 0);
+            if (unitPriceVal) targetRow.querySelector('.cost-input').value = formatWithCommas(unitPriceVal.toString());
+
+            if (item.LocationId) {
+                const locSel = targetRow.querySelector('.loc-select');
+                if (locSel) locSel.value = item.LocationId;
+            }
+            if (item.DefectQty != null) {
+                const defectInput = targetRow.querySelector('input[name$=".DefectQty"]');
+                if (defectInput) defectInput.value = formatWithCommas((item.DefectQty || 0).toString());
+            }
+
+            if (item.LotNumber != null || item.lotNumber != null) {
+                const lotVal = (item.LotNumber ?? item.lotNumber ?? '').toString();
+                const lotInput = targetRow.querySelector('input[name$=".LotNumber"]');
+                if (lotInput) lotInput.value = lotVal;
+            }
+        });
+
+        if (typeof initSelect2 === 'function') initSelect2();
+        refreshLineNumbers();
+        return { newItemNames, matchedCount };
+    }
+
+    document.getElementById('excelFileInput')?.addEventListener('change', async function() {
+        const file = this.files?.[0];
+        if (!file) return;
+
+        const btn = document.getElementById('importExcelBtn');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang nhập...';
+        btn.style.pointerEvents = 'none';
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const token = document.querySelector('#voucherForm input[name="__RequestVerificationToken"]')?.value;
+            const response = await fetch('/Vouchers/ImportLinesExcel', {
+                method: 'POST',
+                headers: token ? { 'RequestVerificationToken': token } : {},
+                body: formData
+            });
+
+            if (!response.ok) {
+                Swal.fire('Lỗi Import Excel', await response.text(), 'error');
+                return;
+            }
+
+            const res = await response.json();
+            let items = [];
+            try { items = JSON.parse(res.data); } catch(e) {}
+            if (!items || items.length === 0) {
+                Swal.fire('Không có dữ liệu', 'File Excel không có dòng hợp lệ.', 'warning');
+                return;
+            }
+
+            const summary = await applyMappedItemsToLines(items);
+            const msg = `Đã nhập ${items.length} dòng từ Excel!\n✅ Khớp vật tư: ${summary.matchedCount}\n🆕 Tạo mới: ${summary.newItemNames.length}`;
+            Swal.fire({
+                title: 'Import Excel thành công!',
+                html: `<div style="text-align:left; white-space:pre-line; font-size:14px;">${msg}</div>`,
+                icon: 'success',
+                confirmButtonColor: '#10b981',
+                background: '#1a1f2e',
+                color: '#e2e8f0',
+                customClass: { popup: 'swal-dark' }
+            });
+        } catch (e) {
+            Swal.fire('Lỗi Import', 'Đã xảy ra lỗi: ' + e, 'error');
+        } finally {
+            btn.innerHTML = originalHtml;
+            btn.style.pointerEvents = 'auto';
+            this.value = '';
+        }
+    });
+
+    document.getElementById('billFileInput').addEventListener('change', async function() {
+        const files = Array.from(this.files || []);
+        if (!files.length) return;
+
+        const btn = document.getElementById('uploadBillBtn');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> OCR ${files.length} bill...`;
+        btn.style.pointerEvents = 'none';
+
+        const token = document.querySelector('#voucherForm input[name="__RequestVerificationToken"]')?.value;
+        const allItems = [];
+
+        try {
+            Swal.fire({
+                title: 'Đang quét hóa đơn...',
+                html: `0/${files.length} bill`,
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading(),
+                background: '#1a1f2e',
+                color: '#e2e8f0',
+                customClass: { popup: 'swal-dark' }
+            });
+
+            for (let i = 0; i < files.length; i++) {
+                Swal.update({ html: `${i + 1}/${files.length} bill` });
+                const formData = new FormData();
+                formData.append('file', files[i]);
+                const response = await fetch('/Vouchers/AnalyzeReceipt', {
+                    method: 'POST',
+                    headers: token ? { 'RequestVerificationToken': token } : {},
+                    body: formData
+                });
+                if (!response.ok) throw new Error(await response.text());
+                const res = await response.json();
+                let items = [];
+                try { items = JSON.parse(res.data); } catch(e) {}
+                if (items && items.length) allItems.push(...items);
+            }
+
+            Swal.close();
+
+            if (!allItems.length) {
+                Swal.fire('Không Thấy Dữ Liệu', 'Không nhận diện được mặt hàng hợp lệ nào từ các hóa đơn.', 'warning');
+                return;
+            }
+
+            // Merge by ItemId + UnitPrice
+            const map = new Map();
+            for (const it of allItems) {
+                const key = `${it.ItemId || 0}__${it.UnitPrice || 0}`;
+                const existing = map.get(key);
+                const q = (it.Quantity || it.quantity || 1);
+                if (!existing) map.set(key, { ...it, Quantity: q });
+                else existing.Quantity = (existing.Quantity || 0) + q;
+            }
+            const merged = Array.from(map.values());
+
+            const summary = await applyMappedItemsToLines(merged);
+            const msg = `Đã quét ${files.length} bill.\nTổng dòng nhận diện: ${allItems.length}\nSau gộp: ${merged.length}\n✅ Khớp vật tư: ${summary.matchedCount}\n🆕 Tạo mới: ${summary.newItemNames.length}`;
+            Swal.fire({
+                title: 'Quét nhiều hóa đơn xong!',
+                html: `<div style="text-align:left; white-space:pre-line; font-size:14px;">${msg}</div>`,
+                icon: 'success',
+                confirmButtonColor: '#10b981',
+                background: '#1a1f2e',
+                color: '#e2e8f0',
+                customClass: { popup: 'swal-dark' }
+            });
+        } catch (e) {
+            Swal.close();
+            Swal.fire('Lỗi Quét Hóa Đơn', '' + e, 'error');
+        } finally {
+            btn.innerHTML = originalHtml;
+            btn.style.pointerEvents = 'auto';
+            this.value = '';
+        }
+    });
+
+
+</script>
+<partial name="_ValidationScriptsPartial" />
+}

@@ -1,0 +1,49 @@
+@model List<WMS.Models.Warehouse>
+@{ ViewData["Title"] = "Quản Lý Kho"; }
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Hệ Thống Kho</h1>
+        <p class="page-subtitle">Quản lý danh sách kho bãi, khu vực và vị trí lưu trữ</p>
+    </div>
+    <div class="page-actions">
+        <a href="/Warehouses/Create" class="btn btn-primary"><i class="fas fa-plus"></i> Thêm Kho Mới</a>
+    </div>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Mã Kho</th><th>Tên Kho</th><th>Địa Chỉ</th>
+                <th>Người Quản Lý</th><th>Điện Thoại</th>
+                <th style="text-align:right;">Số Khu Vực (Zone)</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Any())
+            {
+                <tr><td colspan="7" class="text-center text-muted" style="padding:40px;">Chưa có kho nào được thiết lập</td></tr>
+            }
+            @foreach (var w in Model)
+            {
+                <tr>
+                    <td><a href="/Warehouses/Details/@w.WarehouseId" class="td-code" style="text-decoration:none;">@w.WarehouseCode</a></td>
+                    <td class="td-name fw-600">@w.WarehouseName</td>
+                    <td>@(string.IsNullOrEmpty(w.Address) ? "---" : w.Address)</td>
+                    <td>@(w.ManagerUser != null ? w.ManagerUser.FullName : (string.IsNullOrEmpty(w.ManagerName) ? "---" : w.ManagerName))</td>
+                    <td>@(string.IsNullOrEmpty(w.Phone) ? "---" : w.Phone)</td>
+                    <td class="td-number">@(w.Zones?.Count ?? 0)</td>
+                    <td class="td-actions">
+                        <a href="/Warehouses/Details/@w.WarehouseId" class="btn btn-sm btn-info" title="Cấu hình vị trí"><i class="fas fa-sitemap"></i></a>
+                        <a href="/Warehouses/Edit/@w.WarehouseId" class="btn btn-sm btn-secondary" title="Sửa thông tin"><i class="fas fa-edit"></i></a>
+                        <form method="post" action="/Warehouses/Delete/@w.WarehouseId" style="display:inline;" onsubmit="return confirm('Xóa kho này? (Lưu ý chỉ ẩn đi, không xóa khỏi database)')">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

@@ -1,0 +1,66 @@
+@model List<WMS.ViewModels.WaveBoardRow>
+@{
+    ViewData["Title"] = "Bảng đợt lấy hàng";
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Bảng đợt lấy hàng</h1>
+        <p class="page-subtitle">Điều độ đợt lấy hàng cho kho lớn.</p>
+    </div>
+</div>
+
+<form method="get" class="filter-bar">
+    <div class="form-group">
+        <label class="form-label">Kho</label>
+        <select class="form-control" name="warehouseId">
+            <option value="">-- Tất cả --</option>
+            @foreach (var w in (List<WMS.Models.Warehouse>)ViewBag.Warehouses)
+            {
+                <option value="@w.WarehouseId" selected="@(ViewBag.WarehouseId != null && (int)ViewBag.WarehouseId == w.WarehouseId)">@w.WarehouseCode - @w.WarehouseName</option>
+            }
+        </select>
+    </div>
+    <div class="form-group">
+        <label class="form-label">&nbsp;</label>
+        <button class="btn btn-primary" type="submit">Lọc</button>
+    </div>
+</form>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Đợt</th>
+                <th>Kho</th>
+                <th>Trạng thái</th>
+                <th>Mở / Hoàn tất</th>
+                <th>Tạo lúc</th>
+                <th>Xong lúc</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Any())
+            {
+                <tr><td colspan="7" class="text-center text-muted" style="padding:30px;">Chưa có đợt lấy hàng.</td></tr>
+            }
+            else
+            {
+                foreach (var w in Model)
+                {
+                    <tr>
+                        <td>@w.WaveCode</td>
+                        <td>@w.WarehouseName</td>
+                        <td>@(w.Status switch {1 => "Nháp", 2 => "Đã phát hành", 3 => "Đang lấy", 4 => "Hoàn tất", 5 => "Đã hủy", _ => "N/A"})</td>
+                        <td>@w.OpenTasks / @w.DoneTasks</td>
+                        <td>@w.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>@(w.CompletedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-")</td>
+                        <td><a class="btn btn-secondary" href="/Operations/PickTasks?waveId=@w.WaveId">Xem nhiệm vụ</a></td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+

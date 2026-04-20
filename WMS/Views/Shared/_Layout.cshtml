@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - WMS Pro</title>
+    <meta name="description" content="Hệ thống Quản lý Kho Nguyên Vật Liệu + Thành Phẩm" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+    @if (ViewContext.RouteData.Values["controller"]?.ToString() != "Account")
+    {
+        <aside class="sidebar" id="sidebar">
+            <a class="sidebar-brand" href="/">
+                <div class="brand-icon"><img src="/images/logo.svg" alt="Logo" style="width:100%;height:100%;border-radius:10px;object-fit:cover;"/></div>
+                <div class="brand-text">
+                    <span class="brand-name">WMS Pro</span>
+                    <span class="brand-sub">Nội bộ nhân viên kho</span>
+                </div>
+            </a>
+            <nav class="sidebar-nav">
+                @{
+                    var isStaffOnly = User.IsInRole("Staff") && !User.IsInRole("Manager") && !User.IsInRole("Admin");
+                }
+                <div class="nav-section">
+                    <div class="nav-section-title">Bắt đầu</div>
+                    <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Home" ? "active" : "")" href="/">
+                        <span class="nav-icon"><i class="fas fa-chart-pie"></i></span> Trang chính
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Nghiệp vụ kho</div>
+                    <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Items" ? "active" : "")" href="/Items">
+                        <span class="nav-icon"><i class="fas fa-boxes-stacked"></i></span> Sản phẩm / vật tư
+                    </a>
+                    <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Vouchers" ? "active" : "")" href="/Vouchers">
+                        <span class="nav-icon"><i class="fas fa-file-invoice"></i></span> Tạo & tra cứu phiếu
+                    </a>
+                    @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+                    {
+                        <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Warehouses" && ViewContext.RouteData.Values["action"]?.ToString() == "Index" ? "active" : "")" href="/Warehouses">
+                            <span class="nav-icon"><i class="fas fa-warehouse"></i></span> Cấu Hình Kho
+                        </a>
+                    }
+                    <a class="nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "InventoryMap" ? "active" : "")" href="/Warehouses/InventoryMap">
+                        <span class="nav-icon"><i class="fas fa-th"></i></span> Sơ đồ kho
+                    </a>
+                    @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("Staff"))
+                    {
+                        <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Operations" && ViewContext.RouteData.Values["action"]?.ToString() == "Waves" ? "active" : "")" href="/Operations/Waves">
+                            <span class="nav-icon"><i class="fas fa-layer-group"></i></span> Bảng đợt lấy hàng
+                        </a>
+                        <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Operations" && ViewContext.RouteData.Values["action"]?.ToString() == "PickTasks" ? "active" : "")" href="/Operations/PickTasks">
+                            <span class="nav-icon"><i class="fas fa-list-check"></i></span> Nhiệm vụ lấy hàng
+                        </a>
+                    }
+                    @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+                    {
+                        <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Partners" ? "active" : "")" href="/Partners">
+                            <span class="nav-icon"><i class="fas fa-handshake"></i></span> Đối Tác
+                        </a>
+                    }
+                </div>
+                @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+                {
+                    <div class="nav-section">
+                        <div class="nav-section-title">Danh Mục</div>
+                        <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Categories" ? "active" : "")" href="/Categories">
+                            <span class="nav-icon"><i class="fas fa-tags"></i></span> Danh Mục
+                        </a>
+                        <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Units" ? "active" : "")" href="/Units">
+                            <span class="nav-icon"><i class="fas fa-ruler"></i></span> Đơn Vị Tính
+                        </a>
+                    </div>
+                }
+                <div class="nav-section">
+                    <div class="nav-section-title">Tra cứu nhanh</div>
+                    <a class="nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "Inventory" ? "active" : "")" href="/Reports/Inventory">
+                        <span class="nav-icon"><i class="fas fa-clipboard-list"></i></span> Xem tồn kho
+                    </a>
+                    <a class="nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "StockMovement" ? "active" : "")" href="/Reports/StockMovement">
+                        <span class="nav-icon"><i class="fas fa-exchange-alt"></i></span> Lịch sử nhập xuất
+                    </a>
+                    @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+                    {
+                        <a class="nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "OpsKpi" ? "active" : "")" href="/Reports/OpsKpi">
+                            <span class="nav-icon"><i class="fas fa-gauge-high"></i></span> Chỉ số vận hành
+                        </a>
+                        <a class="nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "StockCount" ? "active" : "")" href="/Reports/StockCount">
+                            <span class="nav-icon"><i class="fas fa-clipboard-check"></i></span> Kiểm Kê Vị Trí
+                        </a>
+                        <a class="nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "StockSnapshot" ? "active" : "")" href="/Reports/StockSnapshot">
+                            <span class="nav-icon"><i class="fas fa-lock"></i></span> Chốt Tồn
+                        </a>
+                        <a class="nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "PeriodLocks" ? "active" : "")" href="/Reports/PeriodLocks">
+                            <span class="nav-icon"><i class="fas fa-calendar-check"></i></span> Khóa Kỳ
+                        </a>
+                    }
+                    @if (User.IsInRole("Admin"))
+                    {
+                        <a class="nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "Alerts" ? "active" : "")" href="/Reports/Alerts">
+                            <span class="nav-icon"><i class="fas fa-bell"></i></span> Cảnh Báo
+                        </a>
+                        <a class="nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "AuditTrail" ? "active" : "")" href="/Reports/AuditTrail">
+                            <span class="nav-icon"><i class="fas fa-history"></i></span> Nhật Ký
+                        </a>
+                    }
+                </div>
+                @if (User.IsInRole("Admin"))
+                {
+                    <div class="nav-section">
+                        <div class="nav-section-title">Hệ Thống</div>
+                        <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Users" ? "active" : "")" href="/Users">
+                            <span class="nav-icon"><i class="fas fa-users-cog"></i></span> Người Dùng
+                        </a>
+                    </div>
+                }
+            </nav>
+            <div class="sidebar-footer">
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <div class="user-info">
+                        <div class="user-avatar">@(User.Identity.Name?.Substring(0, 1).ToUpper())</div>
+                        <div class="user-details">
+                            <div class="user-name">@(User.FindFirst("FullName")?.Value ?? User.Identity.Name)</div>
+                            @{
+                                var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "User";
+                                var roleDisplay = roleClaim switch {
+                                    "Admin" => "Quản Trị Viên",
+                                    "Manager" => "Quản Lý Kho",
+                                    "Staff" => "Nhân Viên Kho",
+                                    "Viewer" => "Chỉ Xem",
+                                    _ => roleClaim
+                                };
+                            }
+                            <div class="user-role">@roleDisplay</div>
+                        </div>
+                        <form method="post" action="/Account/Logout" style="display:inline;">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" title="Đăng xuất" style="color:var(--text-muted);font-size:16px;background:none;border:none;cursor:pointer;">
+                                <i class="fas fa-sign-out-alt"></i>
+                            </button>
+                        </form>
+                    </div>
+                }
+                else
+                {
+                    <a href="/Account/Login" class="btn btn-primary" style="width:100%;justify-content:center;">
+                        <i class="fas fa-sign-in-alt"></i> Đăng Nhập
+                    </a>
+                }
+            </div>
+        </aside>
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+        <main class="main-content">
+            <button id="sidebarToggle" class="sidebar-toggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            @if (TempData["Success"] != null)
+            {
+                <div class="alert alert-success"><i class="fas fa-check-circle"></i> @TempData["Success"]</div>
+            }
+            @if (TempData["Error"] != null)
+            {
+                <div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> @TempData["Error"]</div>
+            }
+            @RenderBody()
+        </main>
+    }
+    else
+    {
+        @RenderBody()
+    }
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebar = document.getElementById('sidebar');
+            const toggle = document.getElementById('sidebarToggle');
+            const overlay = document.getElementById('sidebarOverlay');
+
+            function toggleSidebar() {
+                sidebar.classList.toggle('open');
+                overlay.classList.toggle('active');
+                document.body.style.overflow = sidebar.classList.contains('open') ? 'hidden' : '';
+            }
+
+            if(toggle) toggle.addEventListener('click', toggleSidebar);
+            if(overlay) overlay.addEventListener('click', toggleSidebar);
+        });
+    </script>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,147 @@
+@model List<WMS.Models.StockAlert>
+@{
+    ViewData["Title"] = "Cảnh Báo Hệ Thống";
+    byte? type = ViewBag.Type as byte?;
+    bool unresolvedOnly = (bool)(ViewBag.UnresolvedOnly ?? true);
+    int days = (int)(ViewBag.Days ?? 30);
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Cảnh Báo</h1>
+        <p class="page-subtitle">Tồn kho thấp, tồn cao, sắp hết hạn</p>
+    </div>
+    <div class="page-actions">
+        <form method="post" action="/Reports/RefreshExpiryAlerts" style="margin:0;display:flex;gap:10px;align-items:center;">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="days" value="@days" />
+            <button type="submit" class="btn btn-warning" title="Quét lại dữ liệu hạn dùng và cập nhật cảnh báo">
+                <i class="fas fa-rotate"></i> Làm mới hết hạn
+            </button>
+        </form>
+    </div>
+</div>
+
+<form method="get" class="filter-bar">
+    <div class="form-group">
+        <label class="form-label">Loại</label>
+        <select name="type" class="form-control">
+            <option value="" selected="@(type == null)">Tất cả</option>
+            <option value="1" selected="@(type == 1)">Tồn kho thấp</option>
+            <option value="2" selected="@(type == 2)">Tồn kho cao</option>
+            <option value="3" selected="@(type == 3)">Sắp hết hạn</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label class="form-label">Trạng thái</label>
+        <select name="unresolvedOnly" class="form-control">
+            <option value="true" selected="@(unresolvedOnly)">Chưa xử lý</option>
+            <option value="false" selected="@(!unresolvedOnly)">Tất cả</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label class="form-label">Ngưỡng (ngày hết hạn)</label>
+        <input type="number" min="1" max="365" name="days" class="form-control" value="@days" />
+    </div>
+    <div class="form-group">
+        <label class="form-label">&nbsp;</label>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Lọc</button>
+    </div>
+</form>
+
+<div class="grid-3 mb-3">
+    <div class="stat-card accent">
+        <div class="stat-value">@Model.Count</div>
+        <div class="stat-label">Tổng cảnh báo</div>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-value">@Model.Count(x => !x.IsResolved)</div>
+        <div class="stat-label">Chưa xử lý</div>
+    </div>
+    <div class="stat-card success">
+        <div class="stat-value">@Model.Count(x => x.AlertType == 3 && !x.IsResolved)</div>
+        <div class="stat-label">Sắp hết hạn</div>
+    </div>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th style="width:140px;">Loại</th>
+                <th>Mã VT</th>
+                <th>Tên VT</th>
+                <th style="text-align:right;">SL</th>
+                <th style="text-align:right;">Ngưỡng</th>
+                <th style="width:160px;">Thời gian</th>
+                <th style="width:120px;text-align:center;">Trạng thái</th>
+                <th style="width:120px;text-align:center;">Thao tác</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Any())
+            {
+                <tr>
+                    <td colspan="8" class="text-center text-muted" style="padding:44px;">
+                        <i class="fas fa-bell-slash" style="font-size:26px; display:block; margin-bottom:10px; opacity:0.45;"></i>
+                        Không có cảnh báo
+                    </td>
+                </tr>
+            }
+            else
+            {
+                foreach (var a in Model)
+                {
+                    var typeBadge = a.AlertType switch
+                    {
+                        1 => "badge-warning",
+                        2 => "badge-info",
+                        3 => "badge-danger",
+                        _ => "badge-secondary"
+                    };
+                    var thresholdLabel = a.AlertType == 3 ? $"{(int)a.Threshold} ngày" : a.Threshold.ToString("N2");
+                    <tr style="@(a.IsResolved ? "opacity:0.70;" : "")">
+                        <td><span class="badge @typeBadge">@a.AlertTypeName</span></td>
+                        <td class="td-code text-accent">@a.Item?.ItemCode</td>
+                        <td class="td-name fw-600">@a.Item?.ItemName</td>
+                        <td class="td-number">@a.CurrentStock.ToString("N2")</td>
+                        <td class="td-number">@thresholdLabel</td>
+                        <td>
+                            <div class="fw-600">@a.CreatedAt.ToString("dd/MM/yyyy HH:mm")</div>
+                            <div class="text-muted" style="font-size:11px;">@(a.ResolvedAt.HasValue ? $"Xử lý: {a.ResolvedAt.Value:dd/MM/yyyy HH:mm}" : "")</div>
+                        </td>
+                        <td class="text-center">
+                            @if (a.IsResolved)
+                            {
+                                <span class="chip chip-success"><i class="fas fa-check"></i> Đã xử lý</span>
+                            }
+                            else
+                            {
+                                <span class="chip chip-warning"><i class="fas fa-bolt"></i> Mới</span>
+                            }
+                        </td>
+                        <td class="text-center">
+                            @if (!a.IsResolved)
+                            {
+                                <form method="post" action="/Reports/ResolveAlert" style="display:inline;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@a.AlertId" />
+                                    <input type="hidden" name="type" value="@(type?.ToString() ?? "")" />
+                                    <input type="hidden" name="unresolvedOnly" value="@unresolvedOnly.ToString().ToLower()" />
+                                    <input type="hidden" name="days" value="@days" />
+                                    <button type="submit" class="btn btn-sm btn-ghost" title="Đánh dấu đã xử lý">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </form>
+                            }
+                            <a class="btn btn-sm btn-info" href="/Items/Details/@a.ItemId" title="Xem vật tư">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+

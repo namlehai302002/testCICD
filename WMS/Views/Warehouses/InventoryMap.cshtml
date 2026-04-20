@@ -1,0 +1,523 @@
+@model WMS.Models.Warehouse
+@{
+    ViewData["Title"] = "Sơ Đồ Tồn Kho";
+    var warehouses = ViewBag.Warehouses as List<WMS.Models.Warehouse>;
+    var recentVouchers = ViewBag.RecentVouchers as List<WMS.Models.Voucher> ?? new List<WMS.Models.Voucher>();
+    var activeZones  = Model?.Zones?.Where(z => z.IsActive).ToList() ?? new List<WMS.Models.Zone>();
+    // Tách zone kệ hàng (solid) và bình chứa (liquid)
+    var solidZones   = activeZones.Where(z =>
+        !z.ZoneName.Contains("lỏng", StringComparison.OrdinalIgnoreCase) &&
+        !z.ZoneName.Contains("Liquid", StringComparison.OrdinalIgnoreCase) &&
+        !z.ZoneCode.Contains("LIQ", StringComparison.OrdinalIgnoreCase) &&
+        !z.Locations.Any(l => l.LocationCode.Contains("Tank", StringComparison.OrdinalIgnoreCase))
+    ).ToList();
+    var liquidZones  = activeZones.Where(z =>
+        z.ZoneName.Contains("lỏng", StringComparison.OrdinalIgnoreCase) ||
+        z.ZoneName.Contains("Liquid", StringComparison.OrdinalIgnoreCase) ||
+        z.ZoneCode.Contains("LIQ", StringComparison.OrdinalIgnoreCase) ||
+        z.Locations.Any(l => l.LocationCode.Contains("Tank", StringComparison.OrdinalIgnoreCase))
+    ).ToList();
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><i class="fas fa-th-large text-accent"></i> Sơ Đồ Tồn Kho WMS</h1>
+        <p class="page-subtitle">Hệ thống quản lý kho trực quan - Hàng rắn & Hàng lỏng</p>
+    </div>
+</div>
+
+<!-- Warehouse Selector Cards -->
+<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:20px; margin-bottom:30px;">
+    @foreach (var wh in warehouses!)
+    {
+        <a href="/Warehouses/InventoryMap/@wh.WarehouseId" class="card" style="text-decoration:none; transition:all 0.3s; border: 1px solid @(Model?.WarehouseId == wh.WarehouseId ? "var(--accent)" : "transparent"); background: @(Model?.WarehouseId == wh.WarehouseId ? "rgba(var(--accent-rgb), 0.05)" : "var(--bg-card)");">
+            <div class="card-body" style="display:flex; align-items:center; gap:16px; padding:20px;">
+                <div style="width:50px; height:50px; border-radius:12px; display:flex; align-items:center; justify-content:center; background: @(Model?.WarehouseId == wh.WarehouseId ? "var(--accent)" : "rgba(255,255,255,0.05)"); color: @(Model?.WarehouseId == wh.WarehouseId ? "white" : "var(--text-muted)"); font-size:24px;">
+                    <i class="fas fa-warehouse"></i>
+                </div>
+                <div>
+                    <div style="font-weight:700; color:var(--text-primary); font-size:16px;">@wh.WarehouseName</div>
+                    <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">@wh.WarehouseCode</div>
+                </div>
+                @if (Model?.WarehouseId == wh.WarehouseId)
+                {
+                    <div style="margin-left:auto; color:var(--accent);"><i class="fas fa-check-circle"></i></div>
+                }
+            </div>
+        </a>
+    }
+</div>
+
+@if (Model != null)
+{
+    <!-- Legend -->
+    <div class="wms-legend">
+        <span class="wms-legend-title">Chú Thích:</span>
+        <div class="legend-item">
+            <div class="legend-color" style="background:#4a5568;"></div>
+            <span>Trống (0%)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color legend-normal"></div>
+            <span>Bình Thường (1-70%)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color legend-warning"></div>
+            <span>Gần Đầy (70-90%)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color legend-danger"></div>
+            <span>Đầy / Nguy Hiểm (>90%)</span>
+        </div>
+    </div>
+
+    <!-- Search & Filter Bar -->
+    <div class="wms-toolbar" style="flex-wrap:wrap; gap:8px;">
+        <input type="text" id="searchInput" class="wms-search-input" placeholder="Tìm kiếm theo mã SP hoặc vị trí..." oninput="filterLocations()" style="min-width:200px; flex:1;">
+
+        <!-- Combobox lọc trạng thái -->
+        <select id="statusFilter" class="form-control" onchange="applyStatusFilter()" style="width:auto; min-width:140px; height:36px; padding:4px 10px; font-size:13px; background:var(--bg-card); color:var(--text-primary); border:1px solid rgba(255,255,255,0.1); border-radius:8px; cursor:pointer;">
+            <option value="">📦 Tất cả trạng thái</option>
+            <option value="empty">⬜ Trống (0%)</option>
+            <option value="normal">🟢 Bình thường (1–70%)</option>
+            <option value="warning">🟡 Gần đầy (70–90%)</option>
+            <option value="danger">🔴 Đầy / Nguy hiểm (&gt;90%)</option>
+        </select>
+
+        <!-- Combobox kiểm tra theo phiếu -->
+        <select id="voucherFilter" class="form-control" onchange="highlightVoucherLocations()" style="width:auto; min-width:200px; height:36px; padding:4px 10px; font-size:13px; background:var(--bg-card); color:var(--text-primary); border:1px solid rgba(255,255,255,0.1); border-radius:8px; cursor:pointer;">
+            <option value="">🔍 Kiểm tra theo phiếu nhập...</option>
+
+            @foreach (var v in recentVouchers)
+            {
+                <option value="@v.VoucherId">[@v.VoucherCode] @v.VoucherDate.ToString("dd/MM") – @(v.IsPosted ? "✅ Đã duyệt" : "⏳ Chờ")</option>
+            }
+        </select>
+
+        <button class="wms-filter-btn" onclick="clearAllFilters()" style="background:var(--danger-bg); color:var(--danger); border-color:rgba(239,68,68,0.2); height:36px; white-space:nowrap;">
+            <i class="fas fa-times"></i> Xóa lọc
+        </button>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- SƠ ĐỒ KỆ VẬT LIỆU: chia 2 cột, ô nhỏ gọn               -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    @if (solidZones.Any())
+    {
+        <!-- Grid 20 Cột để fit toàn bộ 20 kệ trên 1 màn hình -->
+        <div style="display:grid; grid-template-columns:repeat(20, minmax(0, 1fr)); gap:4px; align-items:start; margin-bottom:20px; width:100%;">
+            @foreach (var zone in solidZones)
+            {
+                <div class="wms-rack-section" style="padding:4px; border-radius:4px;">
+                    <div style="display:flex; align-items:center; justify-content:center; margin-bottom:4px; gap:4px; text-align:center;">
+                        <div class="wms-rack-title" style="margin:0; font-size:10px; font-weight:bold;">
+                            @zone.ZoneName
+                        </div>
+                        <button class="btn btn-sm btn-primary" style="padding:1px 4px; font-size:8px; line-height:1;" onclick="showAddAreaModal()"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:2px;">
+                        @{
+                            var levels = zone.Locations.Where(l => l.IsActive).GroupBy(l => l.ShelfCode ?? "1").OrderBy(g => g.Key);
+                        }
+                        @foreach (var level in levels)
+                        {
+                            var locsInLevel = level.ToList();
+                            var firstLoc = locsInLevel.First();
+                            var allItemLocs = locsInLevel.SelectMany(l => l.ItemLocations ?? new List<WMS.Models.ItemLocation>()).Where(il => il.Quantity > 0).ToList();
+                            var totalLoad = allItemLocs.Sum(il => il.Quantity * (il.Item?.Weight ?? 1m));
+                            if (totalLoad > 2000m) totalLoad = 2000m;
+                            var maxCap = 2000m;
+                            var percentage = maxCap > 0 ? Math.Round((double)(totalLoad / maxCap) * 100, 0) : 0;
+                            var statusClass = totalLoad <= 0 ? "empty" : percentage <= 70 ? "normal" : percentage <= 90 ? "warning" : "danger";
+                            var itemNames = allItemLocs.Where(il => il.Item != null).Select(il => il.Item!.ItemName).Distinct().ToList();
+                            var itemDisplay = itemNames.Any() ? string.Join(", ", itemNames) : "";
+                            var levelLabel = $"Tầng {level.Key}";
+                            var locIds = string.Join(",", locsInLevel.Select(l => l.LocationId));
+                            <div class="wms-grid-cell @statusClass"
+                                 data-location="@levelLabel" data-item="@itemDisplay"
+                                 data-percentage="@percentage" data-location-id="@firstLoc.LocationId"
+                                 onclick="openShelfModal('@zone.ZoneCode', '@level.Key', [@locIds])"
+                                 style="aspect-ratio:1; padding:2px; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:4px; text-align:center; overflow:hidden;">
+                                <div class="wms-tooltip">@levelLabel | @(string.IsNullOrEmpty(itemDisplay)?"Trống":itemDisplay) | @totalLoad.ToString("N0")kg / @maxCap.ToString("N0")kg (@percentage%)</div>
+                                <span style="font-weight:700; font-size:10px;">T@(level.Key)</span>
+                                <span style="font-size:8px; opacity:0.8; margin-bottom:2px;">(2 Tấn)</span>
+                                @if (totalLoad > 0) {
+                                    <span style="font-weight:800; font-size:11px;">@percentage%</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- BÌNH CHỨA CHẤT LỎNG: full-width, cuối trang            -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    @if (liquidZones.Any())
+    {
+        <div style="margin-top:8px;">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.08);">
+                <i class="fas fa-flask" style="color:var(--accent); font-size:16px;"></i>
+                <span style="font-size:14px; font-weight:700; color:var(--text-primary);">Khu Bình Chứa Chất Lỏng</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:16px;">
+            @foreach (var zone in liquidZones)
+            {
+                <div class="wms-liquid-section">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                        <div class="wms-rack-title" style="margin:0; font-size:13px;">
+                            <i class="fas fa-flask"></i> @zone.ZoneName (@zone.ZoneCode)
+                        </div>
+                        <button class="btn btn-sm btn-primary" onclick="showAddAreaModal()"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div class="wms-tanks-container">
+                        @foreach (var loc in zone.Locations.Where(l => l.IsActive).OrderBy(l => l.LocationCode))
+                        {
+                            var totalLoad = loc.ItemLocations?.Where(il => il.Quantity > 0).Sum(il => il.Quantity) ?? 0;
+                            var maxCap = 50000m;
+                            var percentage = maxCap > 0 ? Math.Round((double)(totalLoad / maxCap) * 100, 1) : 0;
+                            if (percentage > 100) percentage = 100;
+                            var statusClass = percentage <= 70 ? "normal" : percentage <= 90 ? "warning" : "danger";
+                            var itemName = loc.ItemLocations?.Where(il => il.Quantity > 0 && il.Item != null).Select(il => il.Item!.ItemName).FirstOrDefault() ?? "Trống";
+                            <div class="wms-tank-card" onclick="openTankModal('@loc.LocationCode', '@itemName', @((int)totalLoad), @((int)maxCap), @percentage)">
+                                <div class="wms-tank-visual">
+                                    <div class="wms-tank-cylinder"><div class="wms-tank-fill @statusClass" style="height:@percentage%"></div></div>
+                                    <div class="wms-tank-label" style="font-size:9px;">@loc.LocationCode</div>
+                                </div>
+                                <div class="wms-tank-info">
+                                    <div class="wms-tank-header">
+                                        <div class="wms-tank-id" style="font-size:11px;">@loc.LocationCode</div>
+                                        <div class="wms-tank-badge" style="font-size:10px;">@itemName</div>
+                                    </div>
+                                    <div class="wms-progress-bar">
+                                        <div class="wms-progress-track"><div class="wms-progress-fill @statusClass" style="width:@percentage%"></div></div>
+                                        <div class="wms-progress-percent" style="font-size:10px;">@percentage.ToString("0.1")%</div>
+                                    </div>
+                                    <div class="wms-tank-detail" style="font-size:10px;"><strong>@totalLoad.ToString("N0") / @maxCap.ToString("N0") L</strong></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            </div>
+        </div>
+    }
+
+    @if (!Model.Zones.Any(z => z.IsActive))
+    {
+        <div class="card" style="padding:40px; text-align:center;">
+            <i class="fas fa-warehouse" style="font-size:48px; color:var(--text-muted); margin-bottom:16px;"></i>
+            <p style="color:var(--text-muted); font-size:16px;">Kho này chưa có khu vực nào. Hãy thêm khu mới!</p>
+            <button class="btn btn-primary" onclick="showAddAreaModal()" style="margin-top:12px;"><i class="fas fa-plus"></i> Thêm Khu Mới</button>
+        </div>
+    }
+}
+
+<!-- Modal Xem Tồn Kho Vị Trí -->
+<div class="modal-overlay" id="modalStock">
+    <div class="modal" style="max-width: 650px;">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fas fa-boxes text-info"></i> Tồn Kho Tại: <span class="text-accent" id="stockLocName"></span></div>
+            <button type="button" class="modal-close" onclick="document.getElementById('modalStock').classList.remove('active')">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 0;">
+            <div class="table-container flat scroll-y">
+                <table style="margin:0; width:100%;">
+                    <thead>
+                        <tr>
+                            <th style="width:15%">Mã VT</th>
+                            <th style="width:45%">Tên Vật Tư</th>
+                            <th style="width:15%; text-align:right;">Số Lượng</th>
+                            <th style="width:10%">ĐVT</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stockTbody"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="modal-footer" style="padding: 12px 20px; display:flex; justify-content: flex-end; align-items: center;">
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('modalStock').classList.remove('active')">Đóng</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Chi Tiết Bồn Chứa -->
+<div class="modal-overlay" id="modalTank">
+    <div class="modal" style="max-width: 500px;">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fas fa-flask text-info"></i> Chi Tiết Bồn: <span class="text-accent" id="tankName"></span></div>
+            <button type="button" class="modal-close" onclick="document.getElementById('modalTank').classList.remove('active')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="wms-modal-details">
+                <div class="wms-detail-item">
+                    <div class="wms-detail-label">Loại Chất Lỏng</div>
+                    <div class="wms-detail-value" id="tankType"></div>
+                </div>
+                <div class="wms-detail-item">
+                    <div class="wms-detail-label">Thể Tích Hiện Tại</div>
+                    <div class="wms-detail-value" id="tankCurrent"></div>
+                </div>
+                <div class="wms-detail-item">
+                    <div class="wms-detail-label">Sức Chứa Tối Đa</div>
+                    <div class="wms-detail-value" id="tankCapacity"></div>
+                </div>
+                <div class="wms-detail-item">
+                    <div class="wms-detail-label">% Đầy</div>
+                    <div class="wms-detail-value" id="tankPercentage"></div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer" style="padding: 12px 20px; display:flex; justify-content: flex-end; align-items: center;">
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('modalTank').classList.remove('active')">Đóng</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Thêm Khu Mới (LƯU DB) -->
+<div class="modal-overlay" id="modalAddArea">
+    <div class="modal" style="max-width:600px;">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fas fa-plus-circle text-success"></i> Thêm Khu Tồn Kho Mới</div>
+            <button type="button" class="modal-close" onclick="closeAddAreaModal()">&times;</button>
+        </div>
+        <form method="post" action="/Warehouses/CreateZoneWithLocations">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="warehouseId" value="@Model?.WarehouseId" />
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Loại Khu</label>
+                        <select name="zoneType" id="newAreaType" class="form-control">
+                            <option value="1">Khu kệ chứa hàng</option>
+                            <option value="3">Khu chứa chất lỏng</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tên Khu *</label>
+                        <input name="zoneName" id="newAreaName" type="text" class="form-control" placeholder="Ví dụ: Khu kệ A" required />
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Mã Khu *</label>
+                        <input name="zoneCode" id="newAreaCode" type="text" class="form-control" placeholder="Ví dụ: RACK-A" required />
+                    </div>
+                    <div class="form-group">
+                        <label>Thông tin mô tả</label>
+                        <input name="description" id="newAreaDescription" type="text" class="form-control" placeholder="Mô tả ngắn" />
+                    </div>
+                </div>
+                <div class="alert alert-info" style="font-size:12px; margin-top:10px;">
+                    <i class="fas fa-info-circle"></i> <strong>Khu kệ</strong>: Tự động tạo 6 ô (6 tầng × 1 ô, giới hạn 2 tấn/ô). <strong>Khu chất lỏng</strong>: Tự động tạo 4 bồn chứa. Tất cả ô mới sẽ hiển thị xám (trống).
+                </div>
+            </div>
+            <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn btn-secondary" onclick="closeAddAreaModal()">Hủy</button>
+                <button type="submit" class="btn btn-success">Lưu Khu</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<style>
+    .wms-grid-cell.voucher-highlight {
+        outline: 3px solid #f59e0b !important;
+        box-shadow: 0 0 14px 4px rgba(245,158,11,0.7) !important;
+        z-index: 2;
+        animation: voucherPulse 1.4s ease-in-out infinite;
+    }
+    @@keyframes voucherPulse {
+        0%, 100% { box-shadow: 0 0 10px 2px rgba(245,158,11,0.6); }
+        50%       { box-shadow: 0 0 22px 8px rgba(245,158,11,0.9); }
+    }
+</style>
+<script>
+    // ─────────────────────────────────────────────
+    //  STATUS FILTER (combobox)
+    // ─────────────────────────────────────────────
+    function applyStatusFilter() {
+        const val = document.getElementById('statusFilter').value;
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        document.querySelectorAll('.wms-grid-cell').forEach(cell => {
+            const loc  = cell.dataset.location.toLowerCase();
+            const item = cell.dataset.item.toLowerCase();
+            const pct  = parseFloat(cell.dataset.percentage);
+            const statusMatch = !val || getStatusClass(pct) === val;
+            const searchMatch = !searchTerm || loc.includes(searchTerm) || item.includes(searchTerm);
+            cell.style.display = (statusMatch && searchMatch) ? 'flex' : 'none';
+        });
+    }
+
+    function filterLocations() {
+        applyStatusFilter(); // reuse one function
+    }
+
+    function getStatusClass(pct) {
+        if (pct === 0)    return 'empty';
+        if (pct <= 70)    return 'normal';
+        if (pct <= 90)    return 'warning';
+        return 'danger';
+    }
+
+    function clearAllFilters() {
+        document.getElementById('searchInput').value = '';
+        document.getElementById('statusFilter').value = '';
+        document.getElementById('voucherFilter').value = '';
+        document.querySelectorAll('.wms-grid-cell').forEach(c => {
+            c.style.display = 'flex';
+            c.classList.remove('voucher-highlight');
+        });
+    }
+
+    // ─────────────────────────────────────────────
+    //  VOUCHER HIGHLIGHT
+    // ─────────────────────────────────────────────
+    function highlightVoucherLocations() {
+        const voucherId = document.getElementById('voucherFilter').value;
+
+        // Clear previous highlights
+        document.querySelectorAll('.wms-grid-cell').forEach(c => {
+            c.classList.remove('voucher-highlight');
+            c.style.display = 'flex';     // ensure all visible
+        });
+        document.getElementById('statusFilter').value = '';
+        document.getElementById('searchInput').value = '';
+
+        if (!voucherId) return;
+
+        fetch(`/Warehouses/GetVoucherLocations?voucherId=${voucherId}`)
+            .then(r => r.json())
+            .then(locationIds => {
+                if (!locationIds || locationIds.length === 0) {
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire('Chưa có dữ liệu', 'Phiếu này chưa có vị trí nào được ghi nhận (chưa duyệt hoặc không có chi tiết vị trí).', 'info');
+                    } else {
+                        alert('Phiếu này chưa có vị trí nào được ghi nhận (chưa duyệt hoặc không có chi tiết vị trí).');
+                    }
+                    return;
+                }
+
+                let found = 0;
+                document.querySelectorAll('.wms-grid-cell').forEach(cell => {
+                    const locId = parseInt(cell.dataset.locationId);
+                    if (locationIds.includes(locId)) {
+                        cell.classList.add('voucher-highlight');
+                        found++;
+                    }
+                });
+
+                if (found === 0) {
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire('Không tìm thấy', 'Không tìm thấy ô nào khớp với phiếu này trong kho hiện tại. Có thể phiếu thuộc kho khác.', 'warning');
+                    } else {
+                        alert('Không tìm thấy ô nào khớp với phiếu này trong kho hiện tại. Có thể phiếu thuộc kho khác.');
+                    }
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire('Lỗi', 'Lỗi khi tải dữ liệu phiếu.', 'error');
+                } else {
+                    alert('Lỗi khi tải dữ liệu phiếu.');
+                }
+            });
+    }
+
+    // ─────────────────────────────────────────────
+    //  SHELF MODAL (grouped by level)
+    // ─────────────────────────────────────────────
+    async function openShelfModal(zoneCode, shelfCode, locationIds) {
+        document.getElementById('stockLocName').innerText = `${zoneCode} - Tầng ${shelfCode}`;
+        let allItems = [];
+        for (const locId of locationIds) {
+            try {
+                const res = await fetch(`/Warehouses/GetLocationStock?locationId=${locId}`);
+                const data = await res.json();
+                if (data && data.length > 0) allItems.push(...data);
+            } catch(e) { console.error(e); }
+        }
+        // Aggregate by itemCode
+        const grouped = {};
+        allItems.forEach(item => {
+            if (!grouped[item.itemCode]) {
+                grouped[item.itemCode] = { ...item, quantity: 0 };
+            }
+            grouped[item.itemCode].quantity += parseFloat(item.quantity);
+        });
+        const items = Object.values(grouped);
+        let html = '';
+        if (items.length > 0) {
+            items.forEach(item => {
+                html += `<tr>
+                    <td class="td-code text-accent">${item.itemCode}</td>
+                    <td class="td-name">${item.itemName}</td>
+                    <td class="td-number fw-600 text-success">${parseFloat(item.quantity).toLocaleString('vi-VN')}</td>
+                    <td>${item.uom}</td>
+                </tr>`;
+            });
+        } else {
+            html = '<tr><td colspan="4" class="text-center font-italic text-muted" style="padding:30px;"><i class="fas fa-box-open" style="font-size:32px; color:var(--text-muted); display:block; margin-bottom:10px;"></i> Tầng này hiện đang trống.</td></tr>';
+        }
+        document.getElementById('stockTbody').innerHTML = html;
+        document.getElementById('modalStock').classList.add('active');
+    }
+
+    // ─────────────────────────────────────────────
+    //  STOCK MODAL
+    // ─────────────────────────────────────────────
+    function openStockModal(locationCode, locationId) {
+        document.getElementById('stockLocName').innerText = locationCode;
+        fetch(`/Warehouses/GetLocationStock?locationId=${locationId}`)
+            .then(r => r.json())
+            .then(data => {
+                let html = '';
+                if (data && data.length > 0) {
+                    data.forEach(item => {
+                        html += `<tr>
+                            <td class="td-code text-accent">${item.itemCode}</td>
+                            <td class="td-name">${item.itemName}</td>
+                            <td class="td-number fw-600 text-success">${parseFloat(item.quantity).toLocaleString('vi-VN')}</td>
+                            <td>${item.uom}</td>
+                        </tr>`;
+                    });
+                } else {
+                    html = '<tr><td colspan="6" class="text-center font-italic text-muted" style="padding:30px;"><i class="fas fa-box-open" style="font-size:32px; color:var(--text-muted); display:block; margin-bottom:10px;"></i> Vị trí này hiện đang trống.</td></tr>';
+                }
+                document.getElementById('stockTbody').innerHTML = html;
+                document.getElementById('modalStock').classList.add('active');
+            })
+            .catch(err => {
+                console.error('Error loading stock:', err);
+                document.getElementById('stockTbody').innerHTML = '<tr><td colspan="6" class="text-center text-danger" style="padding:20px;">Lỗi tải dữ liệu</td></tr>';
+                document.getElementById('modalStock').classList.add('active');
+            });
+    }
+
+    function showAddAreaModal() {
+        document.getElementById('newAreaType').value = '1';
+        document.getElementById('newAreaName').value = '';
+        document.getElementById('newAreaCode').value = '';
+        document.getElementById('newAreaDescription').value = '';
+        document.getElementById('modalAddArea').classList.add('active');
+    }
+
+    function closeAddAreaModal() {
+        document.getElementById('modalAddArea').classList.remove('active');
+    }
+
+    function openTankModal(tankId, liquidType, currentVolume, maxVolume, percentage) {
+        document.getElementById('tankName').innerText = tankId;
+        document.getElementById('tankType').innerText = liquidType;
+        document.getElementById('tankCurrent').innerText = currentVolume.toLocaleString('vi-VN') + ' lít';
+        document.getElementById('tankCapacity').innerText = maxVolume.toLocaleString('vi-VN') + ' lít';
+        document.getElementById('tankPercentage').innerText = percentage.toFixed(1) + '%';
+        document.getElementById('modalTank').classList.add('active');
+    }
+</script>
+}

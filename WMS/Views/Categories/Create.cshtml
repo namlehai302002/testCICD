@@ -1,0 +1,60 @@
+@model WMS.Models.ItemCategory
+@{ ViewData["Title"] = Model.CategoryId == 0 ? "Thêm Danh Mục" : "Sửa Danh Mục"; }
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">@ViewData["Title"]</h1>
+        <p class="page-subtitle">Nhóm phân loại hàng hóa</p>
+    </div>
+    <div class="page-actions">
+        <a href="/Categories" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Quay lại</a>
+    </div>
+</div>
+
+<div class="user-guide">
+    <div class="user-guide-title"><i class="fas fa-tags"></i> Quy tắc tạo danh mục</div>
+    <div class="step-list">
+        <span class="step-chip"><i class="fas fa-code"></i> Mã ngắn gọn, không trùng</span>
+        <span class="step-chip"><i class="fas fa-layer-group"></i> Tên nhóm theo nghiệp vụ thực tế</span>
+        <span class="step-chip"><i class="fas fa-sort"></i> Dùng thứ tự để sắp xếp menu</span>
+    </div>
+</div>
+
+<div class="card" style="max-width: 760px;">
+    <div class="card-body">
+        <form method="post">
+            @Html.AntiForgeryToken()
+            <div class="form-section-title">Thông tin danh mục</div>
+            <div class="form-group">
+                <label class="form-label">Mã Danh Mục *</label>
+                <input type="text" name="CategoryCode" class="form-control" value="@Model.CategoryCode" required placeholder="VD: THEP-01" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Tên Danh Mục *</label>
+                <input type="text" name="CategoryName" class="form-control" value="@Model.CategoryName" required placeholder="VD: Thép Xây Dựng" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Thứ Tự Sắp Xếp</label>
+                <input type="number" name="SortOrder" class="form-control" value="@(Model.CategoryId == 0 ? 0 : Model.SortOrder)" />
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> @(Model.CategoryId == 0 ? "Thêm Mới" : "Cập Nhật")</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .form-section-title {
+        margin: 6px 0 8px;
+        padding: 6px 10px;
+        border-left: 3px solid var(--accent);
+        background: rgba(14, 165, 233, 0.08);
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--text-primary);
+        text-transform: uppercase;
+        letter-spacing: .4px;
+    }
+</style>

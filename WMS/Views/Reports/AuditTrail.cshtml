@@ -1,0 +1,722 @@
+@model List<WMS.Models.AuditLog>
+@{ ViewData["Title"] = "Nhật Ký Hệ Thống (Audit Trail)"; }
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Nhật Ký Thao Tác (Audit Trail)</h1>
+        <p class="page-subtitle">Giám sát mọi thay đổi, thêm, sửa, xóa trên hệ thống</p>
+    </div>
+</div>
+
+<form method="get" class="filter-bar">
+    <div class="form-group">
+        <label class="form-label">Tài Khoản (Người dùng)</label>
+        <input type="text" name="changedBy" class="form-control" placeholder="Tên đăng nhập..." value="@ViewBag.ChangedBy" />
+    </div>
+    <div class="form-group">
+        <label class="form-label">Tên Bảng (Table)</label>
+        <input type="text" name="tableName" class="form-control" placeholder="VD: Voucher..." value="@ViewBag.TableName" />
+    </div>
+    <div class="form-group">
+        <label class="form-label">Từ ngày</label>
+        <input type="date" name="dateFrom" class="form-control" value="@(((DateTime)ViewBag.DateFrom).ToString("yyyy-MM-dd"))" />
+    </div>
+    <div class="form-group">
+        <label class="form-label">Đến ngày</label>
+        <input type="date" name="dateTo" class="form-control" value="@(((DateTime)ViewBag.DateTo).ToString("yyyy-MM-dd"))" />
+    </div>
+    <div class="form-group">
+        <label class="form-label">&nbsp;</label>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Kiểm Tra</button>
+    </div>
+</form>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th style="width:180px;">Thời Gian</th>
+                <th>Người Thực Hiện</th>
+                <th style="width:140px;">Thao Tác</th>
+                <th style="width:200px;">Nghiệp Vụ (Bảng)</th>
+                <th style="width:100px;">ID Bản Ghi</th>
+                <th style="width:130px; text-align:center;">Chi Tiết</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Any())
+            {
+                <tr><td colspan="6" class="empty-state"><i class="fas fa-history empty-icon"></i><div class="empty-text">Không tìm thấy thay đổi nào</div></td></tr>
+            }
+            @{ var rowIdx = 0; }
+            @foreach (var log in Model)
+            {
+                <tr>
+                    <td>
+                        <div class="fw-600">@log.ChangedAt.ToString("dd/MM/yyyy HH:mm:ss")</div>
+                        <div class="text-muted" style="font-size:11px;">@log.IpAddress</div>
+                    </td>
+                    <td>
+                        <div class="d-flex align-center gap-1">
+                            <i class="fas fa-user-circle text-muted"></i>
+                            <span class="text-accent fw-600">@log.ChangedBy</span>
+                        </div>
+                    </td>
+                    <td>
+                        @if (log.ActionType == "INSERT")
+                        {
+                            <span class="audit-action-pill audit-action-insert">
+                                <i class="fas fa-plus-circle"></i> Thêm Mới
+                            </span>
+                        }
+                        else if (log.ActionType == "UPDATE")
+                        {
+                            <span class="audit-action-pill audit-action-update">
+                                <i class="fas fa-pen"></i> Cập Nhật
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="audit-action-pill audit-action-delete">
+                                <i class="fas fa-trash-alt"></i> Xóa Bỏ
+                            </span>
+                        }
+                    </td>
+                    <td>
+                        <span class="audit-table-badge" data-table="@log.TableName">
+                            <i class="fas fa-database"></i>
+                            <span class="audit-table-text">@log.TableName</span>
+                        </span>
+                    </td>
+                    <td class="fw-600" style="text-align:center;">
+                        <span class="audit-record-id">#@log.RecordId</span>
+                    </td>
+                    <td class="text-center">
+                        <button type="button" class="audit-view-btn"
+                                data-action="@log.ActionType"
+                                data-table="@log.TableName"
+                                data-record="@log.RecordId"
+                                data-idx="@rowIdx">
+                            <i class="fas fa-eye"></i>
+                            <span>Xem</span>
+                        </button>
+                    </td>
+                </tr>
+                rowIdx++;
+            }
+        </tbody>
+    </table>
+</div>
+
+<!-- Hidden data store for OldValue/NewValue (avoid inline JS escaping issues) -->
+@{ var idx = 0; }
+@foreach (var log in Model)
+{
+    <script type="application/json" id="audit-old-@idx">@Html.Raw(log.OldValue ?? "null")</script>
+    <script type="application/json" id="audit-new-@idx">@Html.Raw(log.NewValue ?? "null")</script>
+    idx++;
+}
+
+<!-- Audit Detail Modal (Redesigned) -->
+<div class="audit-modal-overlay" id="auditModal">
+    <div class="audit-modal">
+        <div class="audit-modal-header">
+            <div class="audit-modal-header-left">
+                <div class="audit-modal-icon" id="auditModalIcon">
+                    <i class="fas fa-info-circle"></i>
+                </div>
+                <div>
+                    <h3 class="audit-modal-title" id="auditModalTitle">Chi Tiết Thay Đổi</h3>
+                    <div class="audit-modal-subtitle">
+                        <span id="auditTableFriendly" class="text-accent"></span>
+                        <span class="audit-modal-sep">•</span>
+                        <span id="auditRecordId"></span>
+                    </div>
+                </div>
+            </div>
+            <button class="audit-modal-close" onclick="closeAuditModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="audit-modal-body" id="auditContent">
+            <!-- Content generated by JS -->
+        </div>
+        <div class="audit-modal-footer">
+            <button class="btn btn-secondary" onclick="closeAuditModal()"><i class="fas fa-times"></i> Đóng</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════ STYLES ═══════════════ -->
+<style>
+    /* ── Action Pills ── */
+    .audit-action-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 14px;
+        border-radius: 50px;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+        transition: all 0.2s ease;
+    }
+    .audit-action-pill i { font-size: 11px; }
+
+    .audit-action-insert {
+        background: rgba(16, 185, 129, 0.12);
+        color: #34d399;
+        border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .audit-action-insert:hover { background: rgba(16, 185, 129, 0.22); }
+
+    .audit-action-update {
+        background: rgba(245, 158, 11, 0.12);
+        color: #fbbf24;
+        border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+    .audit-action-update:hover { background: rgba(245, 158, 11, 0.22); }
+
+    .audit-action-delete {
+        background: rgba(239, 68, 68, 0.12);
+        color: #f87171;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+    .audit-action-delete:hover { background: rgba(239, 68, 68, 0.22); }
+
+    /* ── Table Name Badge ── */
+    .audit-table-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        background: rgba(99, 102, 241, 0.1);
+        color: #a5b4fc;
+        border: 1px solid rgba(99, 102, 241, 0.2);
+    }
+    .audit-table-badge i { font-size: 10px; opacity: 0.6; }
+
+    /* ── Record ID ── */
+    .audit-record-id {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-family: 'Fira Code', 'Consolas', monospace;
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-secondary);
+    }
+
+    /* ── View Button ── */
+    .audit-view-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 16px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid rgba(6, 182, 212, 0.35);
+        background: rgba(6, 182, 212, 0.08);
+        color: #22d3ee;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+    .audit-view-btn::before {
+        content: '';
+        position: absolute;
+        top: 0; left: -100%;
+        width: 100%; height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.15), transparent);
+        transition: left 0.5s ease;
+    }
+    .audit-view-btn:hover {
+        background: rgba(6, 182, 212, 0.18);
+        border-color: rgba(6, 182, 212, 0.6);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(6, 182, 212, 0.2);
+    }
+    .audit-view-btn:hover::before { left: 100%; }
+    .audit-view-btn:active { transform: translateY(0); }
+    .audit-view-btn i { font-size: 13px; }
+
+    /* ═══ MODAL ═══ */
+    .audit-modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px);
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+        animation: auditFadeIn 0.2s ease;
+    }
+    .audit-modal-overlay.active {
+        display: flex;
+    }
+
+    @@keyframes auditFadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    @@keyframes auditSlideUp {
+        from { opacity: 0; transform: translateY(20px) scale(0.98); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .audit-modal {
+        width: 95%;
+        max-width: 720px;
+        max-height: 85vh;
+        background: #1a1f35;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+        display: flex;
+        flex-direction: column;
+        animation: auditSlideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden;
+    }
+
+    .audit-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 24px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        background: rgba(0, 0, 0, 0.15);
+    }
+    .audit-modal-header-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+    .audit-modal-icon {
+        width: 42px; height: 42px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+    }
+    .audit-modal-icon.icon-insert {
+        background: rgba(16, 185, 129, 0.15);
+        color: #34d399;
+    }
+    .audit-modal-icon.icon-update {
+        background: rgba(245, 158, 11, 0.15);
+        color: #fbbf24;
+    }
+    .audit-modal-icon.icon-delete {
+        background: rgba(239, 68, 68, 0.15);
+        color: #f87171;
+    }
+
+    .audit-modal-title {
+        font-size: 17px;
+        font-weight: 700;
+        margin: 0;
+        color: #fff;
+    }
+    .audit-modal-subtitle {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 2px;
+    }
+    .audit-modal-sep { margin: 0 6px; opacity: 0.4; }
+
+    .audit-modal-close {
+        width: 36px; height: 36px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text-muted);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 15px;
+        transition: all 0.2s ease;
+    }
+    .audit-modal-close:hover {
+        background: rgba(239, 68, 68, 0.15);
+        color: #f87171;
+        border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    .audit-modal-body {
+        padding: 20px 24px;
+        overflow-y: auto;
+        flex: 1;
+    }
+
+    .audit-modal-footer {
+        padding: 14px 24px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    /* ── Detail Table in Modal ── */
+    .audit-detail-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .audit-detail-table th {
+        background: rgba(0, 0, 0, 0.25) !important;
+        color: var(--text-muted) !important;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+        padding: 10px 14px !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+    }
+    .audit-detail-table td {
+        padding: 10px 14px !important;
+        font-size: 13px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+        vertical-align: top;
+        word-break: break-word;
+    }
+    .audit-detail-table tr:last-child td {
+        border-bottom: none !important;
+    }
+    .audit-detail-table .field-name {
+        color: var(--text-secondary);
+        font-weight: 600;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    /* Old → New value display */
+    .audit-val-old {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 3px 10px;
+        border-radius: 6px;
+        background: rgba(239, 68, 68, 0.1);
+        color: #fca5a5;
+        font-size: 12px;
+        font-family: 'Fira Code', monospace;
+        margin-bottom: 4px;
+        text-decoration: line-through;
+        opacity: 0.8;
+    }
+    .audit-val-new {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 3px 10px;
+        border-radius: 6px;
+        background: rgba(16, 185, 129, 0.1);
+        color: #6ee7b7;
+        font-size: 12px;
+        font-family: 'Fira Code', monospace;
+    }
+    .audit-val-arrow {
+        color: var(--text-muted);
+        font-size: 11px;
+        margin: 2px 0;
+        display: block;
+    }
+    .audit-val-single-new {
+        padding: 3px 10px;
+        border-radius: 6px;
+        background: rgba(16, 185, 129, 0.08);
+        color: #6ee7b7;
+        font-size: 12px;
+        font-family: 'Fira Code', monospace;
+        display: inline-block;
+    }
+    .audit-val-single-old {
+        padding: 3px 10px;
+        border-radius: 6px;
+        background: rgba(239, 68, 68, 0.08);
+        color: #fca5a5;
+        font-size: 12px;
+        font-family: 'Fira Code', monospace;
+        display: inline-block;
+    }
+    .audit-empty-msg {
+        text-align: center;
+        padding: 30px;
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+    .audit-empty-msg i {
+        font-size: 28px;
+        margin-bottom: 10px;
+        display: block;
+        opacity: 0.4;
+    }
+</style>
+
+@section Scripts {
+    <script>
+        // ═══════════════════════════════════════════════════════
+        // TABLE NAME MAPPING (EF entity names → tiếng Việt)
+        // ═══════════════════════════════════════════════════════
+        const tableMap = {
+            // Entity names (from SaveChangesAsync override)
+            'Item':             'Vật Tư / Hàng Hóa',
+            'ItemLocation':     'Vị Trí Vật Tư Trong Kho',
+            'ItemCategory':     'Danh Mục',
+            'Voucher':          'Phiếu Nhập / Xuất',
+            'VoucherDetail':    'Chi Tiết Phiếu Nhập / Xuất',
+            'Warehouse':        'Cấu Hình Kho',
+            'Zone':             'Khu Vực Kho',
+            'Location':         'Vị Trí Trong Kho',
+            'Partner':          'Đối Tác',
+            'UnitOfMeasure':    'Đơn Vị Tính',
+            'UnitConversion':   'Quy Đổi Đơn Vị',
+            'PackagingUnit':    'Quy Cách Đóng Gói',
+            'AppUser':          'Người Dùng Hệ Thống',
+            'AppRole':          'Vai Trò Người Dùng',
+            'StockAlert':       'Cảnh Báo Tồn Kho',
+            // Legacy names (in case old data uses plural)
+            'Items':            'Vật Tư / Hàng Hóa',
+            'ItemLocations':    'Vị Trí Vật Tư Trong Kho',
+            'ItemCategories':   'Danh Mục',
+            'Vouchers':         'Phiếu Nhập / Xuất',
+            'VoucherDetails':   'Chi Tiết Phiếu Nhập / Xuất',
+            'Warehouses':       'Cấu Hình Kho',
+            'Zones':            'Khu Vực Kho',
+            'Locations':        'Vị Trí Trong Kho',
+            'Partners':         'Đối Tác',
+            'AppUsers':         'Người Dùng Hệ Thống',
+            'AppRoles':         'Vai Trò Người Dùng',
+        };
+
+        // ═══════════════════════════════════════════════════════
+        // FIELD NAME MAPPING (DB columns → tiếng Việt)
+        // ═══════════════════════════════════════════════════════
+        const fieldMap = {
+            'ItemId': 'ID Vật Tư', 'ItemCode': 'Mã Vật Tư', 'ItemName': 'Tên Vật Tư',
+            'Barcode': 'Mã Vạch', 'SkuCode': 'Mã SKU',
+            'ItemType': 'Loại', 'CategoryId': 'ID Danh Mục',
+            'BaseUomId': 'ID Đơn Vị Tính', 'CurrentStock': 'Tồn Kho Hiện Tại',
+            'MinThreshold': 'Ngưỡng Tối Thiểu', 'MaxThreshold': 'Ngưỡng Tối Đa',
+            'ReorderPoint': 'Điểm Đặt Hàng', 'UnitCost': 'Giá Vốn',
+            'LastCost': 'Giá Gần Nhất', 'TotalStockValue': 'Tổng Giá Trị Tồn Kho',
+            'Weight': 'Khối Lượng (kg)', 'DefaultLocationId': 'ID Vị Trí Mặc Định',
+            'ImageUrl': 'Hình Ảnh', 'Description': 'Mô Tả / Ghi Chú',
+            'Specifications': 'Thông Số Kỹ Thuật',
+            'IsActive': 'Đang Hoạt Động', 'CreatedAt': 'Ngày Tạo', 'UpdatedAt': 'Ngày Cập Nhật',
+            'CreatedBy': 'Người Tạo',
+            // Voucher
+            'VoucherId': 'ID Phiếu', 'VoucherCode': 'Mã Phiếu', 'VoucherType': 'Loại Phiếu',
+            'VoucherDate': 'Ngày Chứng Từ', 'WarehouseId': 'ID Kho',
+            'DestWarehouseId': 'ID Kho Đích', 'PartnerId': 'ID Đối Tác',
+            'SourceType': 'Nguồn Lập', 'ReferenceNo': 'Số Chứng Từ Gốc',
+            'TotalAmount': 'Tổng Tiền', 'TotalLines': 'Số Dòng',
+            'IsPosted': 'Đã Ghi Sổ', 'IsCancelled': 'Đã Hủy',
+            'CancelledBy': 'Người Hủy', 'CancelledAt': 'Ngày Hủy',
+            'CancelReason': 'Lý Do Hủy', 'IpAddress': 'Địa Chỉ IP',
+            // VoucherDetail
+            'VoucherDetailId': 'ID Chi Tiết', 'TransactionQty': 'Số Lượng Giao Dịch',
+            'TransactionUomId': 'ID ĐVT Giao Dịch', 'ConversionRate': 'Tỷ Lệ Quy Đổi',
+            'BaseQty': 'SL Quy Đổi Cơ Bản', 'UnitPrice': 'Đơn Giá',
+            'LineAmount': 'Thành Tiền', 'LineNumber': 'Số Dòng',
+            'DefectQty': 'SL Lỗi', 'DefectBaseQty': 'SL Lỗi Cơ Bản',
+            'QualityStatus': 'Chất Lượng', 'ExpiryDate': 'Hạn Sử Dụng',
+            'Notes': 'Ghi Chú', 'LocationId': 'ID Vị Trí',
+            'DestLocationId': 'ID Vị Trí Đích', 'PackagingUnitId': 'ID Đóng Gói',
+            // Warehouse / Zone / Location
+            'WarehouseCode': 'Mã Kho', 'WarehouseName': 'Tên Kho',
+            'Address': 'Địa Chỉ', 'ManagerName': 'Quản Lý Kho', 'Phone': 'Điện Thoại',
+            'ZoneId': 'ID Khu Vực', 'ZoneCode': 'Mã Khu', 'ZoneName': 'Tên Khu',
+            'ZoneType': 'Loại Khu', 'LocationCode': 'Mã Vị Trí',
+            'RackCode': 'Mã Kệ', 'ShelfCode': 'Tầng', 'BinCode': 'Ô',
+            'CurrentLoad': 'Tải Hiện Tại',
+            // ItemLocation
+            'Quantity': 'Số Lượng', 'LotNumber': 'Số Lô',
+            'MaxCapacity': 'Sức Chứa Tối Đa', 'TotalCapacity': 'Tổng Sức Chứa',
+            // Partner
+            'PartnerCode': 'Mã Đối Tác', 'PartnerName': 'Tên Đối Tác', 'PartnerType': 'Loại',
+            'TaxCode': 'Mã Số Thuế', 'Email': 'Email',
+            // User
+            'UserId': 'ID Người Dùng', 'UserName': 'Tên Đăng Nhập',
+            'FullName': 'Họ Tên', 'Department': 'Phòng Ban',
+            'RoleId': 'ID Vai Trò', 'LastLoginAt': 'Đăng Nhập Lần Cuối',
+            // UOM
+            'UomId': 'ID ĐVT', 'UomCode': 'Mã ĐVT', 'UomName': 'Tên ĐVT', 'UomGroup': 'Nhóm ĐVT',
+            // Packaging
+            'TenDongGoi': 'Tên Đóng Gói', 'GiaTri': 'Giá Trị',
+            // UnitConversion
+            'FromUomId': 'Từ ĐVT', 'ToUomId': 'Sang ĐVT',
+            // StockAlert
+            'AlertType': 'Loại Cảnh Báo', 'CurrentStock_Alert': 'Tồn Kho Hiện Tại',
+            'Threshold': 'Ngưỡng', 'IsRead': 'Đã Đọc', 'IsResolved': 'Đã Giải Quyết',
+            'ResolvedAt': 'Ngày Giải Quyết',
+            // Generic
+            'ParentVoucherId': 'ID Phiếu Gốc', 'AiOcrLogId': 'ID AI OCR Log',
+        };
+
+        function translateTable(name) { return tableMap[name] || name; }
+        function translateField(name) { return fieldMap[name] || name.replace(/([A-Z])/g, ' $1').trim(); }
+
+        function formatValue(val) {
+            if (val === null || val === undefined || val === '') return '<span style="opacity:0.4">Trống</span>';
+            if (typeof val === 'boolean') return val ? 'Có ✓' : 'Không ✗';
+            if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}T/)) {
+                try {
+                    const d = new Date(val);
+                    return d.toLocaleDateString('vi-VN') + ' ' + d.toLocaleTimeString('vi-VN');
+                } catch(e) { return val; }
+            }
+            if (typeof val === 'number' && Math.abs(val) >= 1000) {
+                return val.toLocaleString('vi-VN');
+            }
+            return String(val);
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // VIEW DETAIL — safe data loading via hidden <script> tags
+        // ═══════════════════════════════════════════════════════
+        function viewAuditDetails(action, table, recordId, dataIdx) {
+            const modal = document.getElementById('auditModal');
+            const content = document.getElementById('auditContent');
+            const titleEl = document.getElementById('auditModalTitle');
+            const iconEl = document.getElementById('auditModalIcon');
+
+            document.getElementById('auditTableFriendly').innerText = translateTable(table);
+            document.getElementById('auditRecordId').innerText = 'Bản ghi #' + recordId;
+
+            // Set icon + title based on action
+            iconEl.className = 'audit-modal-icon';
+            if (action === 'INSERT') {
+                titleEl.innerText = 'Chi Tiết — Thêm Mới';
+                iconEl.classList.add('icon-insert');
+                iconEl.innerHTML = '<i class="fas fa-plus-circle"></i>';
+            } else if (action === 'DELETE') {
+                titleEl.innerText = 'Chi Tiết — Xóa Bỏ';
+                iconEl.classList.add('icon-delete');
+                iconEl.innerHTML = '<i class="fas fa-trash-alt"></i>';
+            } else {
+                titleEl.innerText = 'Chi Tiết — Cập Nhật';
+                iconEl.classList.add('icon-update');
+                iconEl.innerHTML = '<i class="fas fa-pen"></i>';
+            }
+
+            let html = '';
+            try {
+                const oldEl = document.getElementById('audit-old-' + dataIdx);
+                const newEl = document.getElementById('audit-new-' + dataIdx);
+                const oldText = oldEl ? oldEl.textContent.trim() : 'null';
+                const newText = newEl ? newEl.textContent.trim() : 'null';
+                const oldObj = (oldText && oldText !== 'null') ? JSON.parse(oldText) : null;
+                const newObj = (newText && newText !== 'null') ? JSON.parse(newText) : null;
+
+                if (action === 'INSERT') {
+                    html = renderSingleObject(newObj, 'new');
+                } else if (action === 'DELETE') {
+                    html = renderSingleObject(oldObj, 'old');
+                } else {
+                    html = renderDiff(oldObj, newObj);
+                }
+            } catch (e) {
+                console.error("Audit parse error:", e);
+                html = '<div class="audit-empty-msg"><i class="fas fa-exclamation-triangle"></i>Không thể giải mã dữ liệu thay đổi.<br><small style="opacity:0.5">' + e.message + '</small></div>';
+            }
+
+            content.innerHTML = html;
+            modal.classList.add('active');
+        }
+
+        function renderSingleObject(obj, type) {
+            if (!obj) return '<div class="audit-empty-msg"><i class="fas fa-inbox"></i>Không có dữ liệu.</div>';
+            const cssClass = type === 'new' ? 'audit-val-single-new' : 'audit-val-single-old';
+            let rows = '';
+            for (let key in obj) {
+                rows += `<tr>
+                    <td class="field-name">${translateField(key)}</td>
+                    <td><span class="${cssClass}">${formatValue(obj[key])}</span></td>
+                </tr>`;
+            }
+            return `<table class="audit-detail-table">
+                <thead><tr><th style="width:40%">Trường Thông Tin</th><th>Giá Trị</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+        }
+
+        function renderDiff(oldObj, newObj) {
+            if (!oldObj || !newObj) return '<div class="audit-empty-msg"><i class="fas fa-exclamation-circle"></i>Không đủ dữ liệu để so sánh.</div>';
+            let rows = '';
+            const allKeys = Array.from(new Set([...Object.keys(oldObj), ...Object.keys(newObj)]));
+
+            allKeys.forEach(key => {
+                const o = oldObj[key];
+                const n = newObj[key];
+                if (String(o) !== String(n)) {
+                    rows += `<tr>
+                        <td class="field-name">${translateField(key)}</td>
+                        <td>
+                            <div class="audit-val-old">${formatValue(o)}</div>
+                            <span class="audit-val-arrow"><i class="fas fa-arrow-down" style="font-size:10px"></i></span>
+                            <div class="audit-val-new">${formatValue(n)}</div>
+                        </td>
+                    </tr>`;
+                }
+            });
+
+            if (!rows) return '<div class="audit-empty-msg"><i class="fas fa-check-circle" style="color:#34d399"></i>Không có thay đổi nào ở các trường giá trị.</div>';
+
+            return `<table class="audit-detail-table">
+                <thead><tr><th style="width:40%">Trường Thông Tin</th><th>Thay Đổi (Cũ → Mới)</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+        }
+
+        function closeAuditModal() {
+            document.getElementById('auditModal').classList.remove('active');
+        }
+
+        // Close modal on overlay click
+        document.getElementById('auditModal').addEventListener('click', function(e) {
+            if (e.target === this) closeAuditModal();
+        });
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeAuditModal();
+        });
+
+        // ═══════════════════════════════════════════════════════
+        // INIT — translate table names + attach click handlers
+        // ═══════════════════════════════════════════════════════
+        document.addEventListener('DOMContentLoaded', function() {
+            // Translate table names in the list
+            document.querySelectorAll('.audit-table-badge[data-table]').forEach(el => {
+                const raw = el.getAttribute('data-table');
+                el.querySelector('.audit-table-text').innerText = translateTable(raw);
+            });
+
+            // Attach click handlers to view buttons (event delegation safe)
+            document.querySelectorAll('.audit-view-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const action = this.getAttribute('data-action');
+                    const table = this.getAttribute('data-table');
+                    const record = this.getAttribute('data-record');
+                    const idx = this.getAttribute('data-idx');
+                    viewAuditDetails(action, table, record, idx);
+                });
+            });
+        });
+    </script>
+}

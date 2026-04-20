@@ -1,0 +1,91 @@
+@model WMS.Models.Partner
+@{ ViewData["Title"] = Model.PartnerId == 0 ? "Thêm Đối Tác" : "Sửa Đối Tác"; }
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">@ViewData["Title"]</h1>
+        <p class="page-subtitle">Nhập thông tin giao dịch đối tác</p>
+    </div>
+    <div class="page-actions">
+        <a href="/Partners" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Quay lại</a>
+    </div>
+</div>
+
+<div class="user-guide">
+    <div class="user-guide-title"><i class="fas fa-handshake"></i> Mẹo nhập đối tác</div>
+    <div class="step-list">
+        <span class="step-chip"><i class="fas fa-id-card"></i> 1) Mã đối tác duy nhất, dễ tra cứu</span>
+        <span class="step-chip"><i class="fas fa-file-signature"></i> 2) Tên pháp lý đầy đủ</span>
+        <span class="step-chip"><i class="fas fa-phone"></i> 3) Điện thoại/email liên hệ ưu tiên</span>
+    </div>
+</div>
+
+<div class="card" style="max-width: 920px;">
+    <div class="card-body">
+        <form method="post">
+            @Html.AntiForgeryToken()
+            <div class="form-section-title">Thông tin định danh</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Mã Đối Tác *</label>
+                    <input type="text" name="PartnerCode" class="form-control" value="@Model.PartnerCode" required placeholder="VD: NCC-001" />
+                </div>
+                <div class="form-group" style="grid-column: span 2;">
+                    <label class="form-label">Tên Đối Tác (Cá nhân / Doanh nghiệp) *</label>
+                    <input type="text" name="PartnerName" class="form-control" value="@Model.PartnerName" required placeholder="VD: Công ty CP Vật liệu X" />
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Phân Loại *</label>
+                    <select name="PartnerType" class="form-control" required>
+                        <option value="1" selected="@(Model.PartnerType == 1)">Nhà Cung Cấp</option>
+                        <option value="2" selected="@(Model.PartnerType == 2)">Khách Hàng</option>
+                        <option value="3" selected="@(Model.PartnerType == 3)">Cả Hai (NCC + Khách)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Mã Số Thuế (MST)</label>
+                    <input type="text" name="TaxCode" class="form-control" value="@Model.TaxCode" />
+                </div>
+            </div>
+            <div class="form-section-title">Thông tin giao dịch</div>
+            <div class="form-group">
+                <label class="form-label">Địa Chỉ Đăng Ký KD / Nhận Hàng</label>
+                <input type="text" name="Address" class="form-control" value="@Model.Address" />
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Người Liên Hệ / Đại Diện</label>
+                    <input type="text" name="ContactPerson" class="form-control" value="@Model.ContactPerson" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Điện Thoại LH</label>
+                    <input type="text" name="Phone" class="form-control" value="@Model.Phone" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email LH</label>
+                    <input type="email" name="Email" class="form-control" value="@Model.Email" />
+                </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> @(Model.PartnerId == 0 ? "Thêm Mới" : "Cập Nhật")</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .form-section-title {
+        margin: 6px 0 8px;
+        padding: 6px 10px;
+        border-left: 3px solid var(--accent);
+        background: rgba(14, 165, 233, 0.08);
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--text-primary);
+        text-transform: uppercase;
+        letter-spacing: .4px;
+    }
+</style>

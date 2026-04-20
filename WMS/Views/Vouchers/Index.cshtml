@@ -1,0 +1,138 @@
+@model List<WMS.Models.Voucher>
+@{ ViewData["Title"] = "Danh Sách Phiếu"; }
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Phiếu Kho</h1>
+        <p class="page-subtitle">Quản lý giao dịch nhập, xuất, điều chỉnh</p>
+    </div>
+    <div class="page-actions">
+        <a href="/Vouchers/Create?type=1" class="btn btn-primary"><i class="fas fa-plus"></i> Nhập Kho</a>
+        <a href="/Vouchers/Create?type=2" class="btn btn-secondary"><i class="fas fa-minus"></i> Xuất Kho</a>
+        <a href="/Vouchers/Create?type=6" class="btn btn-secondary"><i class="fas fa-exchange-alt"></i> Chuyển Kho</a>
+    </div>
+</div>
+
+<div class="user-guide">
+    <div class="user-guide-title"><i class="fas fa-circle-info"></i> Dành cho nhân viên kho</div>
+    <div class="user-guide-text">Tạo phiếu theo đúng việc đang làm: nhập hàng, xuất nội bộ hoặc chuyển kho. Bấm vào mã phiếu để xem chi tiết.</div>
+</div>
+
+<form method="get" class="filter-bar">
+    <div class="form-group">
+        <label class="form-label">Tìm nhanh</label>
+        <input type="text" name="search" class="form-control" placeholder="Nhập mã phiếu hoặc ghi chú..." value="@ViewBag.Search" />
+    </div>
+    <div class="form-group">
+        <label class="form-label">Loại phiếu</label>
+        <select name="type" class="form-control">
+            <option value="">Tất cả</option>
+            <option value="1" selected="@(ViewBag.Type != null && (byte)ViewBag.Type == 1)">Nhập kho</option>
+            <option value="2" selected="@(ViewBag.Type != null && (byte)ViewBag.Type == 2)">Xuất kho nội bộ</option>
+            <option value="3" selected="@(ViewBag.Type != null && (byte)ViewBag.Type == 3)">Trả Nhà Cung Cấp</option>
+            <option value="4" selected="@(ViewBag.Type != null && (byte)ViewBag.Type == 4)">Khách Trả Hàng</option>
+            <option value="5" selected="@(ViewBag.Type != null && (byte)ViewBag.Type == 5)">Điều Chỉnh Kho</option>
+            <option value="6" selected="@(ViewBag.Type != null && (byte)ViewBag.Type == 6)">Chuyển Kho</option>
+            <option value="7" selected="@(ViewBag.Type != null && (byte)ViewBag.Type == 7)">Nhập Thành Phẩm (Từ SX)</option>
+            <option value="8" selected="@(ViewBag.Type != null && (byte)ViewBag.Type == 8)">Xuất Sản Xuất</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label class="form-label">Từ ngày</label>
+        <input type="date" name="dateFrom" class="form-control" value="@(ViewBag.DateFrom != null ? ((DateTime)ViewBag.DateFrom).ToString("yyyy-MM-dd") : "")" />
+    </div>
+    <div class="form-group">
+        <label class="form-label">Đến ngày</label>
+        <input type="date" name="dateTo" class="form-control" value="@(ViewBag.DateTo != null ? ((DateTime)ViewBag.DateTo).ToString("yyyy-MM-dd") : "")" />
+    </div>
+    <div class="form-group">
+        <label class="form-label">&nbsp;</label>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Tìm dữ liệu</button>
+    </div>
+</form>
+
+<div class="table-actions">
+    <input type="text" id="voucherClientSearch" class="form-control" style="max-width:320px;" placeholder="Lọc nhanh trên bảng hiện tại..." />
+</div>
+
+<div class="table-container">
+    <table id="voucherTable">
+        <thead>
+            <tr>
+                <th>Mã Phiếu</th><th>Ngày Lập</th><th>Loại</th><th>Kho Nhập/Xuất</th>
+                <th>Đối Tác</th><th style="text-align:right;">Số Mặt Hàng</th><th>Trạng Thái</th><th>Người Lập</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Any())
+            {
+                <tr><td colspan="10" class="text-center text-muted" style="padding:40px;">Không có phiếu nào</td></tr>
+            }
+            @foreach (var v in Model)
+            {
+                <tr>
+                    <td><a href="/Vouchers/Details/@v.VoucherId" class="td-code" style="text-decoration:none;">@v.VoucherCode</a></td>
+                    <td>@v.VoucherDate.ToString("dd/MM/yyyy")</td>
+                    <td><span class="badge badge-info">@v.VoucherTypeName</span></td>
+                    <td>@v.Warehouse?.WarehouseName @(v.DestWarehouseId.HasValue ? $" ➡️ {v.DestWarehouse?.WarehouseName}" : "")</td>
+                    <td>@(v.Partner?.PartnerName ?? "---")</td>
+                    <td class="td-number">@v.TotalLines</td>
+
+                    <td><span class="badge @v.StatusBadgeClass">@v.StatusDisplay</span></td>
+                    <td>@v.CreatedBy</td>
+                    <td class="td-actions">
+                        <a href="/Vouchers/Details/@v.VoucherId" class="btn btn-sm btn-secondary" title="Chi tiết"><i class="fas fa-eye"></i></a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="table-pagination" id="voucherPager"></div>
+
+@section Scripts {
+<script>
+(() => {
+    const table = document.getElementById('voucherTable');
+    const pager = document.getElementById('voucherPager');
+    const search = document.getElementById('voucherClientSearch');
+    if (!table || !pager || !search) return;
+    const rows = Array.from(table.querySelectorAll('tbody tr')).filter(r => r.querySelectorAll('td').length > 1);
+    const pageSize = 12;
+    let currentPage = 1;
+    let filtered = rows;
+
+    function render() {
+        const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+        if (currentPage > totalPages) currentPage = totalPages;
+        rows.forEach(r => r.style.display = 'none');
+        filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize).forEach(r => r.style.display = '');
+        pager.innerHTML = '';
+        const prev = document.createElement('button');
+        prev.className = 'btn btn-sm btn-secondary';
+        prev.textContent = 'Trước';
+        prev.disabled = currentPage === 1;
+        prev.onclick = () => { currentPage--; render(); };
+        const next = document.createElement('button');
+        next.className = 'btn btn-sm btn-secondary';
+        next.textContent = 'Sau';
+        next.disabled = currentPage === totalPages;
+        next.onclick = () => { currentPage++; render(); };
+        const info = document.createElement('span');
+        info.className = 'step-chip';
+        info.textContent = `Trang ${currentPage}/${totalPages}`;
+        pager.append(prev, info, next);
+    }
+
+    search.addEventListener('input', () => {
+        const q = search.value.trim().toLowerCase();
+        filtered = rows.filter(r => r.innerText.toLowerCase().includes(q));
+        currentPage = 1;
+        render();
+    });
+
+    render();
+})();
+</script>
+}

@@ -1,0 +1,140 @@
+@model List<WMS.Models.AppUser>
+@{
+    ViewData["Title"] = "Người Dùng";
+    var roleVN = new Dictionary<string, string> {
+        { "Admin", "Quản Trị Viên" },
+        { "Manager", "Quản Lý Kho" },
+        { "Staff", "Nhân Viên Kho" },
+        { "Viewer", "Chỉ Xem" }
+    };
+    Func<string?, string> getVNRole = (name) => name != null && roleVN.ContainsKey(name) ? roleVN[name] : (name ?? "N/A");
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Quản Lý Người Dùng</h1>
+        <p class="page-subtitle">Phân quyền và tài khoản đăng nhập hệ thống</p>
+    </div>
+    <div class="page-actions">
+        <button type="button" class="btn btn-primary" onclick="document.getElementById('modalUser').classList.add('active')">
+            <i class="fas fa-plus"></i> Thêm Tài Khoản
+        </button>
+    </div>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Tài Khoản</th><th>Họ & Tên</th><th>Phân Quyền</th>
+                <th>Kho Quản Lý</th><th>Email</th><th>Ngày Tạo</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var u in Model)
+            {
+                <tr>
+                    <td class="td-code text-accent">@u.UserName</td>
+                    <td class="td-name fw-600">@u.FullName</td>
+                    <td><span class="badge @(u.Role?.RoleName == "Admin" ? "badge-danger" : u.Role?.RoleName == "Manager" ? "badge-warning" : "badge-info")">@getVNRole(u.Role?.RoleName)</span></td>
+                    <td>@(u.Warehouse?.WarehouseName ?? "Tất cả kho")</td>
+                    <td>@(string.IsNullOrEmpty(u.Email) ? "---" : u.Email)</td>
+                    <td>@u.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                    <td class="td-actions">
+                        <button type="button" class="btn btn-sm btn-secondary" title="Đổi Mật Khẩu" onclick="openResetModal(@u.UserId, '@u.UserName')"><i class="fas fa-key"></i></button>
+                        <form method="post" action="/Users/Delete/@u.UserId" style="display:inline;" onsubmit="return confirm('Khóa tài khoản này?')">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal Thêm Người Dùng -->
+<div class="modal-overlay" id="modalUser">
+    <div class="modal">
+        <form method="post" action="/Users/Create">
+            @Html.AntiForgeryToken()
+            <div class="modal-header">
+                <div class="modal-title">Tạo Tài Khoản Mới</div>
+                <button type="button" class="modal-close" onclick="document.getElementById('modalUser').classList.remove('active')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Tên đăng nhập *</label>
+                        <input type="text" name="userName" class="form-control" required autocomplete="new-password" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Mật khẩu *</label>
+                        <input type="password" name="password" class="form-control" required autocomplete="new-password" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Họ & Tên *</label>
+                    <input type="text" name="fullName" class="form-control" required />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="email" class="form-control" />
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Vai trò *</label>
+                        <select name="roleId" class="form-control" required>
+                            @foreach(var r in (List<WMS.Models.AppRole>)ViewBag.Roles) { <option value="@r.RoleId">@getVNRole(r.RoleName)</option> }
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Quản lý kho (Tùy chọn)</label>
+                        <select name="warehouseId" class="form-control">
+                            <option value="">-- Quản lý tất cả --</option>
+                            @foreach(var w in (List<WMS.Models.Warehouse>)ViewBag.Warehouses) { <option value="@w.WarehouseId">@w.WarehouseName</option> }
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('modalUser').classList.remove('active')">Hủy</button>
+                <button type="submit" class="btn btn-primary">Tạo Tài Khoản</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Đổi MK -->
+<div class="modal-overlay" id="modalReset">
+    <div class="modal" style="max-width: 400px;">
+        <form method="post" action="/Users/ResetPassword">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="resetUserId" />
+            <div class="modal-header">
+                <div class="modal-title">Đổi mật khẩu: <span id="resetUserName" class="text-accent"></span></div>
+                <button type="button" class="modal-close" onclick="document.getElementById('modalReset').classList.remove('active')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Mật khẩu mới *</label>
+                    <input type="password" name="newPassword" class="form-control" required autocomplete="new-password" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('modalReset').classList.remove('active')">Hủy</button>
+                <button type="submit" class="btn btn-danger">Cập Nhật Mk</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function openResetModal(id, name) {
+        document.getElementById('resetUserId').value = id;
+        document.getElementById('resetUserName').innerText = name;
+        document.getElementById('modalReset').classList.add('active');
+    }
+</script>
+}

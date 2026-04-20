@@ -1,0 +1,168 @@
+@model List<WMS.ViewModels.StockSnapshotCompareRow>
+@{
+    ViewData["Title"] = "Chốt Tồn (Stock Snapshot)";
+    var snapshotDate = (DateTime)(ViewBag.SnapshotDate ?? DateTime.UtcNow.Date);
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Chốt Tồn Kho (Snapshot)</h1>
+        <p class="page-subtitle">Lưu “tồn chốt” theo kho/ngày để đối soát kiểm kê. Phiếu nhập/xuất ghi nhận phát sinh; snapshot dùng để chốt sổ và tạo phiếu điều chỉnh khi lệch.</p>
+    </div>
+    <div class="page-actions">
+        @if (ViewBag.WarehouseId != null)
+        {
+            <a class="btn btn-success"
+               href="/Reports/ExportStockSnapshot?warehouseId=@ViewBag.WarehouseId&snapshotDate=@snapshotDate.ToString("yyyy-MM-dd")">
+                <i class="fas fa-file-excel"></i> Xuất Excel
+            </a>
+            <a class="btn btn-secondary"
+               href="/Vouchers/CreateAdjustmentFromSnapshot?warehouseId=@ViewBag.WarehouseId&snapshotDate=@snapshotDate.ToString("yyyy-MM-dd")">
+                <i class="fas fa-sliders-h"></i> Tạo phiếu điều chỉnh
+            </a>
+        }
+    </div>
+</div>
+
+<form method="get" class="filter-bar">
+    <div class="form-group">
+        <label class="form-label">Kho *</label>
+        <select name="warehouseId" class="form-control" required>
+            <option value="">-- Chọn kho --</option>
+            @foreach (var w in (List<WMS.Models.Warehouse>)ViewBag.Warehouses)
+            {
+                <option value="@w.WarehouseId" selected="@(ViewBag.WarehouseId != null && (int)ViewBag.WarehouseId == w.WarehouseId)">@w.WarehouseName</option>
+            }
+        </select>
+    </div>
+    <div class="form-group">
+        <label class="form-label">Ngày chốt</label>
+        <input type="date" name="snapshotDate" class="form-control" value="@snapshotDate.ToString("yyyy-MM-dd")" />
+    </div>
+    <div class="form-group">
+        <label class="form-label">&nbsp;</label>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Xem dữ liệu</button>
+    </div>
+</form>
+
+@if (ViewBag.WarehouseId != null)
+{
+    var isPreview = (bool)(ViewBag.IsPreview ?? false);
+    <div class="card mb-3">
+        <div class="card-body" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div class="text-muted" style="font-size:13px;">
+                @(isPreview
+                    ? "Đây là dữ liệu PREVIEW (tồn hiện tại) sẽ được lưu thành snapshot nếu bạn bấm Chốt tồn."
+                    : "Đang xem snapshot đã chốt và so sánh với tồn hiện tại. Nếu lệch, hãy tạo phiếu điều chỉnh (không sửa snapshot bằng tay).")
+            </div>
+            <form method="post" action="/Reports/GenerateStockSnapshot" style="margin:0;display:flex;gap:10px;align-items:center;">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="warehouseId" value="@ViewBag.WarehouseId" />
+                <input type="hidden" name="snapshotDate" value="@snapshotDate.ToString("yyyy-MM-dd")" />
+                <button type="submit" class="btn btn-warning" id="generateSnapshotBtn">
+                    <i class="fas fa-lock"></i> Chốt tồn (Generate)
+                </button>
+            </form>
+        </div>
+    </div>
+}
+
+<div class="grid-3 mb-3">
+    <div class="stat-card accent">
+        <div class="stat-value">@Model.Count</div>
+        <div class="stat-label">Số mã đã chốt</div>
+    </div>
+    <div class="stat-card success">
+        <div class="stat-value">@Model.Sum(x => x.SnapshotValue).ToString("N0")</div>
+        <div class="stat-label">Tổng giá trị (VNĐ)</div>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-value">@((int)(ViewBag.DiffCount ?? 0))</div>
+        <div class="stat-label">Mã đang lệch snapshot</div>
+    </div>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Mã VT</th>
+                <th>Tên VT</th>
+                <th>ĐVT</th>
+                <th style="text-align:right;">Tồn chốt</th>
+                <th style="text-align:right;">Tồn hiện tại</th>
+                <th style="text-align:right;">Chênh lệch</th>
+                <th style="text-align:right;">Giá trị chênh (VNĐ)</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Any())
+            {
+                <tr><td colspan="7" class="text-center text-muted" style="padding:40px;">Chưa có snapshot cho điều kiện đã chọn</td></tr>
+            }
+            else
+            {
+                foreach (var s in Model)
+                {
+                    var diff = s.DiffQty;
+                    <tr>
+                        <td class="td-code text-accent">@s.ItemCode</td>
+                        <td class="td-name fw-600">@s.ItemName</td>
+                        <td>@s.UomCode</td>
+                        <td class="td-number text-accent fw-700">@s.SnapshotQty.ToString("N2")</td>
+                        <td class="td-number">@s.CurrentQty.ToString("N2")</td>
+                        <td class="td-number fw-700 @(diff == 0 ? "text-muted" : diff > 0 ? "text-success" : "text-danger")">
+                            @(diff == 0 ? "0" : (diff > 0 ? "+" : ""))@diff.ToString("N2")
+                        </td>
+                        <td class="td-number @(s.DiffValue == 0 ? "text-muted" : s.DiffValue > 0 ? "text-success" : "text-danger")">
+                            @(s.DiffValue == 0 ? "0" : (s.DiffValue > 0 ? "+" : ""))@s.DiffValue.ToString("N0")
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+        @if (Model.Any())
+        {
+            <tfoot>
+                <tr>
+                    <td colspan="6" class="text-right fw-700" style="padding:14px;">TỔNG GIÁ TRỊ CHÊNH:</td>
+                    <td class="td-number fw-700" style="font-size:16px;">@Model.Sum(x => x.DiffValue).ToString("N0")</td>
+                </tr>
+            </tfoot>
+        }
+    </table>
+</div>
+
+@section Scripts {
+<script>
+    // Replace browser confirm() with SweetAlert
+    const btn = document.getElementById('generateSnapshotBtn');
+    if (btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const form = btn.closest('form');
+            const count = @Model.Count;
+            const dateStr = '@snapshotDate.ToString("dd/MM/yyyy")';
+            if (typeof Swal === 'undefined') { form.submit(); return; }
+            Swal.fire({
+                title: 'Chốt tồn kho?',
+                html: `<div style="text-align:left; line-height:1.9; font-size:14px;">
+                    <div><b>Ngày chốt:</b> ${dateStr}</div>
+                    <div><b>Số mã sẽ chốt:</b> ${count}</div>
+                    <div style="margin-top:8px; color:#94a3b8; font-size:12px;">
+                        Snapshot là dữ liệu chốt sổ. Nếu lệch, dùng <b>phiếu điều chỉnh</b> để khớp, không sửa snapshot trực tiếp.
+                    </div>
+                </div>`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Chốt tồn',
+                cancelButtonText: 'Hủy',
+                confirmButtonColor: '#f59e0b',
+                background: '#1a1f2e',
+                color: '#e2e8f0',
+                customClass: { popup: 'swal-dark' }
+            }).then(r => { if (r.isConfirmed) form.submit(); });
+        });
+    }
+</script>
+}

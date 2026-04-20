@@ -1,0 +1,71 @@
+@model List<WMS.Models.Partner>
+@{ ViewData["Title"] = "Đối Tác"; }
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Nhà Cung Cấp & Khách Hàng</h1>
+        <p class="page-subtitle">Quản lý danh bạ đối tác kinh doanh</p>
+    </div>
+    <div class="page-actions">
+        <a href="/Partners/Create" class="btn btn-primary"><i class="fas fa-plus"></i> Thêm Đối Tác Mới</a>
+    </div>
+</div>
+
+<form method="get" class="filter-bar">
+    <div class="form-group">
+        <label class="form-label">Tên, Mã đối tác</label>
+        <input type="text" name="search" class="form-control" placeholder="Tìm kiếm..." value="@ViewBag.Search" />
+    </div>
+    <div class="form-group">
+        <label class="form-label">Phân Loại</label>
+        <select name="type" class="form-control">
+            <option value="">Tất cả</option>
+            <option value="1" selected="@(ViewBag.Type != null && (byte)ViewBag.Type == 1)">Nhà Cung Cấp</option>
+            <option value="2" selected="@(ViewBag.Type != null && (byte)ViewBag.Type == 2)">Khách Hàng</option>
+            <option value="3" selected="@(ViewBag.Type != null && (byte)ViewBag.Type == 3)">NCC + Khách Hàng</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label class="form-label">&nbsp;</label>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Lọc</button>
+    </div>
+</form>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Mã</th><th>Tên Đối Tác</th><th>Phân Loại</th>
+                <th>Mã Số Thuế</th><th>Điện Thoại</th><th>Người Liên Hệ</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Any())
+            {
+                <tr><td colspan="7" class="text-center text-muted" style="padding:40px;">Chưa có đối tác nào</td></tr>
+            }
+            @foreach (var p in Model)
+            {
+                <tr>
+                    <td class="td-code text-accent">@p.PartnerCode</td>
+                    <td class="td-name fw-600">@p.PartnerName</td>
+                    <td>
+                        <span class="badge @(p.PartnerType == 1 ? "badge-info" : p.PartnerType == 2 ? "badge-success" : "badge-purple")">
+                            @(p.PartnerType == 1 ? "Nhà Cung Cấp" : p.PartnerType == 2 ? "Khách Hàng" : "NCC + Khách Hàng")
+                        </span>
+                    </td>
+                    <td class="td-number">@(string.IsNullOrEmpty(p.TaxCode) ? "---" : p.TaxCode)</td>
+                    <td class="td-number">@(string.IsNullOrEmpty(p.Phone) ? "---" : p.Phone)</td>
+                    <td>@(string.IsNullOrEmpty(p.ContactPerson) ? "---" : p.ContactPerson)</td>
+                    <td class="td-actions">
+                        <a href="/Partners/Edit/@p.PartnerId" class="btn btn-sm btn-secondary" title="Sửa"><i class="fas fa-edit"></i></a>
+                        <form method="post" action="/Partners/Delete/@p.PartnerId" style="display:inline;" onsubmit="return confirm('Khóa đối tác này?')">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

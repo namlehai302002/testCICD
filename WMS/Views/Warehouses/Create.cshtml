@@ -1,0 +1,86 @@
+@model WMS.Models.Warehouse
+@{ ViewData["Title"] = Model.WarehouseId == 0 ? "Thêm Kho" : "Sửa Kho"; }
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">@ViewData["Title"]</h1>
+        <p class="page-subtitle">Thông tin chi tiết về kho vật lý</p>
+    </div>
+    <div class="page-actions">
+        <a href="/Warehouses" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Quay lại</a>
+    </div>
+</div>
+
+<div class="user-guide">
+    <div class="user-guide-title"><i class="fas fa-compass"></i> Cách nhập nhanh</div>
+    <div class="step-list">
+        <span class="step-chip"><i class="fas fa-hashtag"></i> 1) Nhập mã kho duy nhất</span>
+        <span class="step-chip"><i class="fas fa-location-dot"></i> 2) Điền tên kho và địa chỉ rõ ràng</span>
+        <span class="step-chip"><i class="fas fa-user"></i> 3) Bổ sung người quản lý để dễ bàn giao</span>
+    </div>
+</div>
+
+<div class="card" style="max-width: 920px;">
+    <div class="card-body">
+        <form method="post">
+            @Html.AntiForgeryToken()
+            <div class="form-section-title">Thông tin nhận diện kho</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Mã Kho (Độc nhất) *</label>
+                    <input type="text" name="WarehouseCode" class="form-control" value="@Model.WarehouseCode" required placeholder="VD: KHO-CHINH" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tên Kho *</label>
+                    <input type="text" name="WarehouseName" class="form-control" value="@Model.WarehouseName" required placeholder="VD: Kho NVL Tổng" />
+                </div>
+            </div>
+            <div class="form-section-title">Thông tin vận hành</div>
+            <div class="form-group">
+                <label class="form-label">Địa Chỉ *</label>
+                <input type="text" name="Address" class="form-control" value="@Model.Address" required placeholder="Số 1, Đường 2, Phường 3..." />
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Người Quản Lý Kho</label>
+                    <select name="ManagerUserId" class="form-control">
+                        <option value="">-- Chọn quản lý --</option>
+                        @foreach (var u in (List<WMS.Models.AppUser>)ViewBag.ManagerUsers)
+                        {
+                            if (Model.ManagerUserId == u.UserId)
+                            {
+                                <option value="@u.UserId" selected>@u.FullName (@u.UserName)</option>
+                            }
+                            else
+                            {
+                                <option value="@u.UserId">@u.FullName (@u.UserName)</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Số Điện Thoại (+84)</label>
+                    <input type="text" name="Phone" class="form-control" value="@Model.Phone" placeholder="09xxxx..." />
+                </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> @(Model.WarehouseId == 0 ? "Thêm Mới" : "Cập Nhật")</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .form-section-title {
+        margin: 6px 0 8px;
+        padding: 6px 10px;
+        border-left: 3px solid var(--accent);
+        background: rgba(14, 165, 233, 0.08);
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--text-primary);
+        text-transform: uppercase;
+        letter-spacing: .4px;
+    }
+</style>

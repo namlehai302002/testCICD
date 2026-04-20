@@ -1,0 +1,66 @@
+@model List<WMS.Models.ItemCategory>
+@{ ViewData["Title"] = "Danh Mục Vật Tư"; }
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Danh Mục Vật Tư</h1>
+        <p class="page-subtitle">Quản lý phân loại nhóm hàng hóa / nguyên vật liệu</p>
+    </div>
+    <div class="page-actions">
+        <a href="/Categories/Create" class="btn btn-primary"><i class="fas fa-plus"></i> Thêm Danh Mục</a>
+    </div>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Mã Nhóm</th><th>Tên Nhóm / Danh Mục</th><th style="text-align:center;">Sắp Xếp</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Any())
+            {
+                <tr><td colspan="4" class="text-center text-muted" style="padding:40px;">Chưa có danh mục nào</td></tr>
+            }
+            @foreach (var c in Model)
+            {
+                <tr>
+                    <td class="td-code text-accent">@c.CategoryCode</td>
+                    <td class="td-name fw-600">@c.CategoryName</td>
+                    <td class="text-center">@c.SortOrder</td>
+                    <td class="td-actions text-right">
+                        <a href="/Categories/Edit/@c.CategoryId" class="btn btn-sm btn-secondary" title="Sửa"><i class="fas fa-edit"></i></a>
+                        <form method="post" action="/Categories/Delete/@c.CategoryId" style="display:inline;" class="js-confirm-delete">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@section Scripts {
+<script>
+    document.querySelectorAll('.js-confirm-delete').forEach(f => {
+        f.addEventListener('submit', function(e) {
+            e.preventDefault();
+            if (typeof Swal === 'undefined') { this.submit(); return; }
+            Swal.fire({
+                title: 'Xóa danh mục?',
+                text: 'Thao tác này không thể hoàn tác.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Xóa',
+                cancelButtonText: 'Hủy',
+                confirmButtonColor: '#ef4444',
+                background: '#1a1f2e',
+                color: '#e2e8f0',
+                customClass: { popup: 'swal-dark' }
+            }).then(r => { if (r.isConfirmed) this.submit(); });
+        });
+    });
+</script>
+}

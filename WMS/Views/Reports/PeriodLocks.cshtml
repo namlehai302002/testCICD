@@ -1,0 +1,89 @@
+@model List<WMS.Models.WarehousePeriodLock>
+@{
+    ViewData["Title"] = "Khóa kỳ kho";
+    var warehouses = (List<WMS.Models.Warehouse>)ViewBag.Warehouses;
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Khóa kỳ kế toán theo kho</h1>
+        <p class="page-subtitle">Khi khóa kỳ, hệ thống chặn tạo/duyệt/hủy phiếu có ngày chứng từ nhỏ hơn hoặc bằng ngày khóa.</p>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="post" action="/Reports/SetPeriodLock" class="filter-bar">
+            @Html.AntiForgeryToken()
+            <div class="form-group">
+                <label class="form-label">Kho *</label>
+                <select name="warehouseId" class="form-control" required>
+                    <option value="">-- Chọn kho --</option>
+                    @foreach (var w in warehouses)
+                    {
+                        <option value="@w.WarehouseId">@w.WarehouseCode - @w.WarehouseName</option>
+                    }
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Khóa đến ngày *</label>
+                <input type="date" name="lockDate" class="form-control" required />
+            </div>
+            <div class="form-group" style="min-width:300px;">
+                <label class="form-label">Lý do</label>
+                <input type="text" name="reason" class="form-control" placeholder="Ví dụ: đã chốt sổ tháng 03/2026" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">&nbsp;</label>
+                <button type="submit" class="btn btn-warning"><i class="fas fa-lock"></i> Khóa / Cập nhật</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Kho</th>
+                <th>Ngày khóa</th>
+                <th>Trạng thái</th>
+                <th>Lý do</th>
+                <th>Người khóa</th>
+                <th>Thời điểm</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Any())
+            {
+                <tr><td colspan="7" class="text-center text-muted" style="padding:30px;">Chưa có dữ liệu khóa kỳ.</td></tr>
+            }
+            else
+            {
+                foreach (var l in Model)
+                {
+                    <tr>
+                        <td>@(l.Warehouse?.WarehouseCode ?? l.WarehouseId.ToString())</td>
+                        <td>@l.LockDate.ToString("dd/MM/yyyy")</td>
+                        <td>@(l.IsActive ? "Đang khóa" : "Đã mở")</td>
+                        <td>@(string.IsNullOrWhiteSpace(l.Reason) ? "-" : l.Reason)</td>
+                        <td>@l.LockedBy</td>
+                        <td>@l.LockedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>
+                            @if (l.IsActive)
+                            {
+                                <form method="post" action="/Reports/ClearPeriodLock">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@l.WarehousePeriodLockId" />
+                                    <button type="submit" class="btn btn-secondary">Mở khóa</button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
