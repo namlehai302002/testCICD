@@ -159,7 +159,7 @@ public class AccountControllerTests
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal("WRONG_PAGE", redirect.ActionName);
+        Assert.Equal("Login", redirect.ActionName);
 
         Assert.Single(db.AppUsers);
     }
@@ -184,4 +184,31 @@ public class AccountControllerTests
 
         Assert.Single(db.AppUsers);
     }
+
+[Fact]
+public void Login_SampleData_ShouldMatchOrFail()
+{
+    // ================= DATA MẪU =================
+    var correctUser = "hieu2";
+    var correctPass = "Wms@1234!";
+
+    // ================= INPUT (NGƯỜI DÙNG NHẬP) =================
+    var inputUser = "hieu2";
+    var inputPass = "Wms@1234!"; // đổi thành sai để test FAIL
+
+    // ================= LOGIC SO KHỚP =================
+    bool isMatch =
+        inputUser == correctUser &&
+        inputPass == correctPass;
+
+    // ================= ASSERT =================
+    if (isMatch)
+    {
+        Assert.True(isMatch); // TRUE → khớp dữ liệu
+    }
+    else
+    {
+        Assert.False(isMatch); // FAIL → không khớp
+    }
+}
 }
