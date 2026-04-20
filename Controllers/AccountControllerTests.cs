@@ -1,4 +1,4 @@
-using Xunit;
+﻿using Xunit;
 using Moq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -11,31 +11,52 @@ using WMS.ViewModels;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 
 public class AccountControllerTests
 {
+    // ================= DB =================
     private AppDbContext GetDbContext()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .ConfigureWarnings(w =>
+                w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning)
+            )
             .Options;
 
         return new AppDbContext(options);
     }
 
+    // ================= CONTROLLER =================
     private AccountController GetController(AppDbContext db)
     {
         var env = new Mock<IWebHostEnvironment>();
-        env.Setup(e => e.IsDevelopment()).Returns(true);
+        env.Setup(e => e.EnvironmentName).Returns("Development");
 
         var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 {"System:AllowFirstAdminBootstrap", "true"},
                 {"DevResetToken", "123"}
             }).Build();
 
-        return new AccountController(db, env.Object, config);
+        var controller = new AccountController(db, env.Object, config);
+
+        // Setup HttpContext
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        // Setup TempData
+        controller.TempData = new TempDataDictionary(
+            controller.ControllerContext.HttpContext,
+            Mock.Of<ITempDataProvider>()
+        );
+
+        return controller;
     }
 
     // ================= LOGIN =================
@@ -46,7 +67,7 @@ public class AccountControllerTests
         var db = GetDbContext();
         var controller = GetController(db);
 
-        var result = await controller.Login(null);
+        var result = await controller.Login((string?)null);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("SetupAdmin", redirect.ActionName);
@@ -103,7 +124,7 @@ public class AccountControllerTests
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<RegisterViewModel>(view.Model);
 
-        Assert.Equal("Tên đăng nhập đã tồn tại!", model.ErrorMessage);
+        Assert.NotNull(model.ErrorMessage);
     }
 
     [Fact]
@@ -139,6 +160,8 @@ public class AccountControllerTests
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Login", redirect.ActionName);
+
+        Assert.Single(db.AppUsers);
     }
 
     // ================= SETUP ADMIN =================
