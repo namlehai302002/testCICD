@@ -186,29 +186,19 @@ public class AccountControllerTests
     }
 
 [Fact]
-public void Login_SampleData_ShouldMatchOrFail()
+public void Login_SampleData_ShouldFail()
 {
-    // ================= DATA MẪU =================
     var correctUser = "hieu2";
     var correctPass = "Wms@1234!";
 
-    // ================= INPUT (NGƯỜI DÙNG NHẬP) =================
     var inputUser = "hieu2";
-    var inputPass = "Wms@123455!"; // đổi thành sai để test FAIL
+    var inputPass = "Wms@1234!";
 
-    // ================= LOGIC SO KHỚP =================
     bool isMatch =
         inputUser == correctUser &&
         inputPass == correctPass;
 
-    // ================= ASSERT =================
-    if (isMatch)
-    {
-        Assert.True(isMatch); // TRUE → khớp dữ liệu
-    }
-    else
-    {
-        Assert.False(isMatch); // FAIL → không khớp
-    }
+    // ép fail khi KHÔNG khớp
+    Assert.True(isMatch, "Data mismatch → TEST FAIL");
 }
 }
