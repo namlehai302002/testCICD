@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "O5/+c04vAkw=",
+  "dgSpecHash": "HEvfoYY3MHA=",
   "success": true,
-  "projectFilePath": "D:\\FILE DOWLOAD DỰ ÁN\\WMS\\WMS\\WMS.csproj",
+  "projectFilePath": "D:\\FILE DOWLOAD DỰ ÁN\\WMS\\testCICD\\WMS\\WMS.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Hoang Nam\\.nuget\\packages\\azure.core\\1.25.0\\azure.core.1.25.0.nupkg.sha512",
     "C:\\Users\\Hoang Nam\\.nuget\\packages\\azure.identity\\1.7.0\\azure.identity.1.7.0.nupkg.sha512",
