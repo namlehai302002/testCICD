@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("WMS.Tests")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3202165452ba3e09d2fae85aa37437023f5619bc")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+018a7ed1e970c8f9609db77f023d93f3de5a658e")]
 [assembly: System.Reflection.AssemblyProductAttribute("WMS.Tests")]
 [assembly: System.Reflection.AssemblyTitleAttribute("WMS.Tests")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
