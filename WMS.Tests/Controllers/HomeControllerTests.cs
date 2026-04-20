@@ -38,7 +38,7 @@ public class HomeControllerTests
         // seed data minimal để không bị null
         db.Items.Add(new Item
         {
-            Id = 1,
+            ItemId = 1,
             IsActive = true,
             CurrentStock = 10,
             MinThreshold = 5,
@@ -46,8 +46,8 @@ public class HomeControllerTests
             TotalStockValue = 1000
         });
 
-        db.Warehouses.Add(new Warehouse { Id = 1, IsActive = true });
-        db.Partners.Add(new Partner { Id = 1, IsActive = true });
+        db.Warehouses.Add(new Warehouse { WarehouseId = 1, IsActive = true });
+        db.Partners.Add(new Partner { PartnerId = 1, IsActive = true });
 
         db.SaveChanges();
 
