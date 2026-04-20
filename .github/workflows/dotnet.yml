@@ -1,4 +1,4 @@
-name: WMS CI/CD (.NET 8)
+name: WMS Tests CI/CD
 
 on:
   push:
@@ -12,10 +12,7 @@ env:
 
 jobs:
 
-# =========================
-# 1. BUILD + TEST (CI)
-# =========================
-  build-test:
+  test:
     runs-on: ubuntu-latest
 
     steps:
@@ -27,7 +24,7 @@ jobs:
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
-    # Restore solution (quan trọng: restore theo .sln)
+    # Restore toàn solution
     - name: Restore solution
       run: dotnet restore WMS.sln
 
@@ -35,43 +32,13 @@ jobs:
     - name: Build solution
       run: dotnet build WMS.sln --configuration ${{ env.CONFIG }} --no-restore
 
-    # Run test project riêng
-    - name: Run tests
+    # =========================
+    # CHẠY TOÀN BỘ TEST TRONG WMS.Tests
+    # (tự động detect tất cả Controllers/*.cs)
+    # =========================
+    - name: Run ALL tests in WMS.Tests
       run: dotnet test WMS.Tests/WMS.Tests.csproj --configuration ${{ env.CONFIG }} --no-build --verbosity normal
 
-# =========================
-# 2. PUBLISH WEB PROJECT
-# =========================
-    - name: Publish WMS project
-      run: dotnet publish WMS/WMS.csproj -c ${{ env.CONFIG }} -o publish
-
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: wms-app
-        path: publish
-
-# =========================
-# 3. DEPLOY (OPTION - IIS SERVER)
-# =========================
-  deploy:
-    needs: build-test
-    runs-on: windows-latest
-
-    steps:
-    - name: Download artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: wms-app
-        path: publish
-
-    - name: Deploy to IIS
-      run: |
-        $source = "publish\*"
-        $target = "C:\inetpub\wwwroot\WMS"
-
-        Write-Host "Deploying WMS..."
-
-        iisreset /stop
-        robocopy $source $target /MIR /NFL /NDL /NJH /NJS
-        iisreset /start
+    # Optional: xuất report
+    - name: Test Report
+      run: dotnet test WMS.Tests/WMS.Tests.csproj --logger "trx;LogFileName=test-results.trx"
