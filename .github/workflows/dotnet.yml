@@ -1,4 +1,4 @@
-name: .NET CI/CD (WMS)
+name: WMS CI/CD (.NET 8)
 
 on:
   push:
@@ -6,7 +6,15 @@ on:
   pull_request:
     branches: [ "main" ]
 
+env:
+  DOTNET_VERSION: "8.0.x"
+  CONFIG: "Release"
+
 jobs:
+
+# =========================
+# 1. BUILD + TEST (CI)
+# =========================
   build-test:
     runs-on: ubuntu-latest
 
@@ -17,13 +25,53 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 8.0.x
+        dotnet-version: ${{ env.DOTNET_VERSION }}
 
-    - name: Restore
-      run: dotnet restore
+    # Restore solution (quan trọng: restore theo .sln)
+    - name: Restore solution
+      run: dotnet restore WMS.sln
 
-    - name: Build
-      run: dotnet build --no-restore
+    # Build toàn solution
+    - name: Build solution
+      run: dotnet build WMS.sln --configuration ${{ env.CONFIG }} --no-restore
 
-    - name: Test
-      run: dotnet test --no-build --verbosity normal
+    # Run test project riêng
+    - name: Run tests
+      run: dotnet test WMS.Tests/WMS.Tests.csproj --configuration ${{ env.CONFIG }} --no-build --verbosity normal
+
+# =========================
+# 2. PUBLISH WEB PROJECT
+# =========================
+    - name: Publish WMS project
+      run: dotnet publish WMS/WMS.csproj -c ${{ env.CONFIG }} -o publish
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: wms-app
+        path: publish
+
+# =========================
+# 3. DEPLOY (OPTION - IIS SERVER)
+# =========================
+  deploy:
+    needs: build-test
+    runs-on: windows-latest
+
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: wms-app
+        path: publish
+
+    - name: Deploy to IIS
+      run: |
+        $source = "publish\*"
+        $target = "C:\inetpub\wwwroot\WMS"
+
+        Write-Host "Deploying WMS..."
+
+        iisreset /stop
+        robocopy $source $target /MIR /NFL /NDL /NJH /NJS
+        iisreset /start
