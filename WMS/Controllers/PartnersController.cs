@@ -5,7 +5,7 @@ using WMS.Data;
 using WMS.Models;
 
 namespace WMS.Controllers;
-
+[Authorize(Roles = "Admin,Manager")]
 public class PartnersController : Controller
 {
     private readonly AppDbContext _db;

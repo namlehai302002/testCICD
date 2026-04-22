@@ -13,18 +13,18 @@ primary
 lastDtbSucceeded
 
 [properties]
-AssemblyName=WMS
+AssemblyName=WMS.Tests
 CommandLineArgsForDesignTimeEvaluation=-langversion:12.0 -define:TRACE
 CompilerGeneratedFilesOutputPath=
 MaxSupportedLangVersion=12.0
 ProjectAssetsFile=<PATH>obj/project.assets.json
-RootNamespace=WMS
+RootNamespace=WMS.Tests
 RunAnalyzers=
 RunAnalyzersDuringLiveAnalysis=
 SolutionPath=<PATH>../WMS.sln
 TargetFrameworkIdentifier=.NETCoreApp
-TargetPath=<PATH>bin/Debug/net8.0/WMS.dll
-TargetRefPath=<PATH>obj/Debug/net8.0/ref/WMS.dll
+TargetPath=<PATH>bin/Debug/net8.0/WMS.Tests.dll
+TargetRefPath=<PATH>obj/Debug/net8.0/ref/WMS.Tests.dll
 TemporaryDependencyNodeTargetIdentifier=net8.0
 
 [commandLineArguments]
@@ -43,8 +43,8 @@ TemporaryDependencyNodeTargetIdentifier=net8.0
 /debug:portable
 /filealign:512
 /optimize-
-/out:obj\Debug\net8.0\WMS.dll
-/refout:obj\Debug\net8.0\refint\WMS.dll
+/out:obj\Debug\net8.0\WMS.Tests.dll
+/refout:obj\Debug\net8.0\refint\WMS.Tests.dll
 /target:exe
 /warnaserror-
 /utf8output
@@ -53,102 +53,24 @@ TemporaryDependencyNodeTargetIdentifier=net8.0
 /warnaserror+:NU1605,SYSLIB0011
 
 [sourceFiles]
-Authorization/PermissionAuthorization.cs
+<NUGET>/microsoft.net.test.sdk/17.8.0/build/netcoreapp3.1/Microsoft.NET.Test.Sdk.Program.cs
 Controllers/
- AccountController.cs
- CategoriesController.cs
- HomeController.cs
- ItemsController.cs
- OperationsController.cs
- PartnersController.cs
- ReportsController.cs
- SystemController.cs
- UsersController.cs
- VouchersController.cs
- WarehousesController.cs
-Data/AppDbContext.cs
-Migrations/
- 20260326164214_AddDefectQty.cs
- 20260326164214_AddDefectQty.Designer.cs
- 20260327155959_AddItemFixesV2.cs
- 20260327155959_AddItemFixesV2.Designer.cs
- 20260401223127_AddWeightToItem.cs
- 20260401223127_AddWeightToItem.Designer.cs
- 20260401223232_AddWeightField.cs
- 20260401223232_AddWeightField.Designer.cs
- 20260402035621_SeedAdminRole.cs
- 20260402035621_SeedAdminRole.Designer.cs
- 20260403075738_AddCapacityFields.cs
- 20260403075738_AddCapacityFields.Designer.cs
- 20260403082839_AddTotalCapacityToItemLocation.cs
- 20260403082839_AddTotalCapacityToItemLocation.Designer.cs
- 20260403165629_AddPackagingUnitIdToVoucherDetails.cs
- 20260403165629_AddPackagingUnitIdToVoucherDetails.Designer.cs
- 20260408063102_AddUomGroup.cs
- 20260408063102_AddUomGroup.Designer.cs
- 20260414070330_AddLotAndRowVersionAndBatchIndexes.cs
- 20260414070330_AddLotAndRowVersionAndBatchIndexes.Designer.cs
- 20260414102431_AddStockCountAndWarehousePeriodLock.cs
- 20260414102431_AddStockCountAndWarehousePeriodLock.Designer.cs
- 20260414103456_AddStockCountApproverFlow.cs
- 20260414103456_AddStockCountApproverFlow.Designer.cs
- 20260414103714_AddStockCountApprovalReason.cs
- 20260414103714_AddStockCountApprovalReason.Designer.cs
- 20260414104054_AddStockCountUnlockAudit.cs
- 20260414104054_AddStockCountUnlockAudit.Designer.cs
- 20260414110133_AddLargeWarehouseExecutionCore.cs
- 20260414110133_AddLargeWarehouseExecutionCore.Designer.cs
- 20260414115454_HardenReservationIdempotencyAndIndexes.cs
- 20260414115454_HardenReservationIdempotencyAndIndexes.Designer.cs
- 20260414134928_AddInboundReviewAccountability.cs
- 20260414134928_AddInboundReviewAccountability.Designer.cs
- 20260414135958_FixInboundReviewDefaultsAndConstraints.cs
- 20260414135958_FixInboundReviewDefaultsAndConstraints.Designer.cs
- 20260414173602_LinkWarehouseManagerToAppUser.cs
- 20260414173602_LinkWarehouseManagerToAppUser.Designer.cs
- 20260414175458_HardenBusinessLogicAndConversionUniqueness.cs
- 20260414175458_HardenBusinessLogicAndConversionUniqueness.Designer.cs
- AppDbContextModelSnapshot.cs
-Models/
- AppUser.cs
- AuditModels.cs
- BillOfMaterial.cs
- ErrorViewModel.cs
- Item.cs
- ItemCategory.cs
- ItemLocation.cs
- Location.cs
- PackagingUnit.cs
- Partner.cs
- PickTask.cs
- PickTaskScanLog.cs
- StockCountLine.cs
- StockCountSheet.cs
- StockReservation.cs
- UnitConversion.cs
- UnitOfMeasure.cs
- Voucher.cs
- VoucherDetail.cs
- Warehouse.cs
- WarehousePeriodLock.cs
- Wave.cs
- WaveLine.cs
- Zone.cs
+ AccountControllerTests.cs
+ BusinessLogicHardeningTests.cs
+ HomeControllerTests.cs
+ UnitTest1.cs
 obj/Debug/net8.0/
  .NETCoreApp,Version=v8.0.AssemblyAttributes.cs
- WMS.AssemblyInfo.cs
- WMS.GlobalUsings.g.cs
- WMS.RazorAssemblyInfo.cs
-Program.cs
-ViewModels/
- RegisterViewModel.cs
- ViewModels.cs
+ WMS.Tests.AssemblyInfo.cs
+ WMS.Tests.GlobalUsings.g.cs
 
 [metadataReferences]
+../WMS/obj/Debug/net8.0/ref/WMS.dll
 <NUGET>/
  azure.core/1.25.0/lib/net5.0/Azure.Core.dll
  azure.identity/1.7.0/lib/netstandard2.0/Azure.Identity.dll
  bcrypt.net-next/4.0.3/lib/net6.0/BCrypt.Net-Next.dll
+ castle.core/5.1.1/lib/net6.0/Castle.Core.dll
  closedxml.parser/2.0.0/lib/netstandard2.1/ClosedXML.Parser.dll
  closedxml/0.105.0/lib/netstandard2.1/ClosedXML.dll
  documentformat.openxml.framework/3.1.1/lib/net8.0/DocumentFormat.OpenXml.Framework.dll
@@ -293,9 +215,11 @@ ViewModels/
   System.IO.Pipelines.dll
   System.Security.Cryptography.Xml.dll
   System.Threading.RateLimiting.dll
- microsoft.bcl.asyncinterfaces/6.0.0/lib/netstandard2.1/Microsoft.Bcl.AsyncInterfaces.dll
+ microsoft.bcl.asyncinterfaces/1.1.1/ref/netstandard2.1/Microsoft.Bcl.AsyncInterfaces.dll
+ microsoft.codecoverage/17.8.0/lib/netcoreapp3.1/Microsoft.VisualStudio.CodeCoverage.Shim.dll
  microsoft.data.sqlclient/5.1.1/ref/net6.0/Microsoft.Data.SqlClient.dll
  microsoft.entityframeworkcore.abstractions/8.0.0/lib/net8.0/Microsoft.EntityFrameworkCore.Abstractions.dll
+ microsoft.entityframeworkcore.inmemory/8.0.0/lib/net8.0/Microsoft.EntityFrameworkCore.InMemory.dll
  microsoft.entityframeworkcore.relational/8.0.0/lib/net8.0/Microsoft.EntityFrameworkCore.Relational.dll
  microsoft.entityframeworkcore.sqlserver/8.0.0/lib/net8.0/Microsoft.EntityFrameworkCore.SqlServer.dll
  microsoft.entityframeworkcore/8.0.0/lib/net8.0/Microsoft.EntityFrameworkCore.dll
@@ -472,12 +396,28 @@ ViewModels/
   System.Xml.XPath.XDocument.dll
   WindowsBase.dll
  microsoft.sqlserver.server/1.0.0/lib/netstandard2.0/Microsoft.SqlServer.Server.dll
+ microsoft.testplatform.testhost/17.8.0/lib/netcoreapp3.1/
+  Microsoft.TestPlatform.CommunicationUtilities.dll
+  Microsoft.TestPlatform.CoreUtilities.dll
+  Microsoft.TestPlatform.CrossPlatEngine.dll
+  Microsoft.TestPlatform.PlatformAbstractions.dll
+  Microsoft.TestPlatform.Utilities.dll
+  Microsoft.VisualStudio.TestPlatform.Common.dll
+  Microsoft.VisualStudio.TestPlatform.ObjectModel.dll
+  testhost.dll
+ moq/4.20.72/lib/net6.0/Moq.dll
+ newtonsoft.json/13.0.1/lib/netstandard2.0/Newtonsoft.Json.dll
+ nuget.frameworks/6.5.0/lib/netstandard2.0/NuGet.Frameworks.dll
  rbush.signed/4.0.0/lib/net8.0/RBush.dll
  sixlabors.fonts/1.0.0/lib/netcoreapp3.1/SixLabors.Fonts.dll
  system.identitymodel.tokens.jwt/6.24.0/lib/net6.0/System.IdentityModel.Tokens.Jwt.dll
  system.io.packaging/8.0.1/lib/net8.0/System.IO.Packaging.dll
  system.memory.data/1.0.2/lib/netstandard2.0/System.Memory.Data.dll
  system.security.cryptography.protecteddata/6.0.0/lib/net6.0/System.Security.Cryptography.ProtectedData.dll
+ xunit.abstractions/2.0.3/lib/netstandard2.0/xunit.abstractions.dll
+ xunit.assert/2.5.0/lib/netstandard1.1/xunit.assert.dll
+ xunit.extensibility.core/2.5.0/lib/netstandard1.1/xunit.core.dll
+ xunit.extensibility.execution/2.5.0/lib/netstandard1.1/xunit.execution.dotnet.dll
 
 [analyzerReferences]
 <NUGET>/microsoft.aspnetcore.app.ref/8.0.22/analyzers/dotnet/cs/
@@ -487,9 +427,6 @@ ViewModels/
 <NUGET>/microsoft.aspnetcore.app.ref/8.0.22/analyzers/dotnet/roslyn4.4/cs/
  Microsoft.Extensions.Logging.Generators.dll
  Microsoft.Extensions.Options.SourceGeneration.dll
-<NUGET>/microsoft.codeanalysis.analyzers/3.3.3/analyzers/dotnet/cs/
- Microsoft.CodeAnalysis.Analyzers.dll
- Microsoft.CodeAnalysis.CSharp.Analyzers.dll
 <NUGET>/
  microsoft.entityframeworkcore.analyzers/8.0.0/analyzers/dotnet/cs/Microsoft.EntityFrameworkCore.Analyzers.dll
  microsoft.netcore.app.ref/8.0.22/analyzers/dotnet/cs/
@@ -499,127 +436,13 @@ ViewModels/
   Microsoft.Interop.SourceGeneration.dll
   System.Text.Json.SourceGeneration.dll
   System.Text.RegularExpressions.Generator.dll
-C:/Program Files/dotnet/sdk/10.0.101/Sdks/Microsoft.NET.Sdk.Razor/source-generators/
- Microsoft.AspNetCore.Razor.Utilities.Shared.dll
- Microsoft.CodeAnalysis.Razor.Compiler.dll
- Microsoft.Extensions.ObjectPool.dll
-C:/Program Files/dotnet/sdk/10.0.101/Sdks/Microsoft.NET.Sdk.Web/analyzers/cs/
- Microsoft.AspNetCore.Analyzers.dll
- Microsoft.AspNetCore.Mvc.Analyzers.dll
+ xunit.analyzers/1.2.0/analyzers/dotnet/cs/
+  xunit.analyzers.dll
+  xunit.analyzers.fixes.dll
 C:/Program Files/dotnet/sdk/10.0.101/Sdks/Microsoft.NET.Sdk/analyzers/
  Microsoft.CodeAnalysis.CSharp.NetAnalyzers.dll
  Microsoft.CodeAnalysis.NetAnalyzers.dll
 
 [analyzerConfigFiles]
 C:/Program Files/dotnet/sdk/10.0.101/Sdks/Microsoft.NET.Sdk/analyzers/build/config/analysislevel_8_default.globalconfig
-obj/Debug/net8.0/WMS.GeneratedMSBuildEditorConfig.editorconfig
-
-[additionalFiles]
-Views/Account/
- DevResetPassword.cshtml
- Login.cshtml
- Register.cshtml
- SetupAdmin.cshtml
-Views/Categories/
- Create.cshtml
- Edit.cshtml
- Index.cshtml
-Views/Home/
- Index.cshtml
- Privacy.cshtml
-Views/Items/
- Create.cshtml
- Details.cshtml
- Edit.cshtml
- Index.cshtml
-Views/Operations/
- PickTasks.cshtml
- Waves.cshtml
-Views/Partners/
- Create.cshtml
- Edit.cshtml
- Index.cshtml
-Views/Reports/
- Alerts.cshtml
- AuditTrail.cshtml
- Inventory.cshtml
- OpsKpi.cshtml
- PeriodLocks.cshtml
- StockCount.cshtml
- StockMovement.cshtml
- StockSnapshot.cshtml
-Views/Shared/
- Error.cshtml
- _Layout.cshtml
- _ScannerModal.cshtml
- _ValidationScriptsPartial.cshtml
-Views/
- Units/Index.cshtml
- Users/Index.cshtml
- Vouchers/
-  Create.cshtml
-  Details.cshtml
-  Index.cshtml
- Warehouses/
-  Create.cshtml
-  Details.cshtml
-  Edit.cshtml
-  Index.cshtml
-  InventoryMap.cshtml
- _ViewImports.cshtml
- _ViewStart.cshtml
-
-[dynamicFiles]
-Views/Account/
- DevResetPassword.cshtml
- Login.cshtml
- Register.cshtml
- SetupAdmin.cshtml
-Views/Categories/
- Create.cshtml
- Edit.cshtml
- Index.cshtml
-Views/Home/
- Index.cshtml
- Privacy.cshtml
-Views/Items/
- Create.cshtml
- Details.cshtml
- Edit.cshtml
- Index.cshtml
-Views/Operations/
- PickTasks.cshtml
- Waves.cshtml
-Views/Partners/
- Create.cshtml
- Edit.cshtml
- Index.cshtml
-Views/Reports/
- Alerts.cshtml
- AuditTrail.cshtml
- Inventory.cshtml
- OpsKpi.cshtml
- PeriodLocks.cshtml
- StockCount.cshtml
- StockMovement.cshtml
- StockSnapshot.cshtml
-Views/Shared/
- Error.cshtml
- _Layout.cshtml
- _ScannerModal.cshtml
- _ValidationScriptsPartial.cshtml
-Views/
- Units/Index.cshtml
- Users/Index.cshtml
- Vouchers/
-  Create.cshtml
-  Details.cshtml
-  Index.cshtml
- Warehouses/
-  Create.cshtml
-  Details.cshtml
-  Edit.cshtml
-  Index.cshtml
-  InventoryMap.cshtml
- _ViewImports.cshtml
- _ViewStart.cshtml
+obj/Debug/net8.0/WMS.Tests.GeneratedMSBuildEditorConfig.editorconfig

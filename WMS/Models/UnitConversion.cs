@@ -4,6 +4,8 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace WMS.Models;
 
 [Table("UnitConversions")]
+
+
 public class UnitConversion
 {
     [Key]

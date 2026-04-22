@@ -5,7 +5,7 @@ using WMS.Data;
 using WMS.Models;
 
 namespace WMS.Controllers;
-
+[Authorize(Roles = "Admin,Manager")]
 public class CategoriesController : Controller
 {
     private readonly AppDbContext _db;
