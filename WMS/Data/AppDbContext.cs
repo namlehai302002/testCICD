@@ -9,7 +9,11 @@ public class AppDbContext : DbContext
 {
     private readonly IHttpContextAccessor? _httpContextAccessor;
 
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+    public AppDbContext(DbContextOptions<AppDbContext> options)
+    : base(options)
+{
+    _httpContextAccessor = null;
+}
 
     public AppDbContext(DbContextOptions<AppDbContext> options, IHttpContextAccessor httpContextAccessor)
         : base(options)
@@ -37,128 +41,78 @@ public class AppDbContext : DbContext
         "ParentItem", "ChildItem", "Uom", "BaseUom", "PasswordHash"
     };
 
-    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+{
+    // ❌ KHÔNG dùng transaction khi InMemory
+    if (Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory")
     {
-        // Ensure audit logs and business data commit atomically
-        var startedTx = false;
         if (Database.CurrentTransaction == null)
         {
             await Database.BeginTransactionAsync(cancellationToken);
-            startedTx = true;
         }
+    }
 
-        var auditEntries = new List<AuditLog>();
-        var httpContext = _httpContextAccessor?.HttpContext;
-        var userName = httpContext?.User?.Identity?.Name ?? "system";
-        var ipAddress = httpContext?.Connection?.RemoteIpAddress?.ToString();
+    var auditEntries = new List<AuditLog>();
 
-        var entries = ChangeTracker.Entries()
-            .Where(e => _trackedTables.Contains(e.Entity.GetType().Name)
-                     && e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
-            .ToList();
+    var httpContext = _httpContextAccessor?.HttpContext;
+    var userName = httpContext?.User?.Identity?.Name ?? "system";
+    var ipAddress = httpContext?.Connection?.RemoteIpAddress?.ToString() ?? "test";
 
-        // Track which entries are INSERTs (we'll capture their values AFTER save when keys are generated)
-        var insertEntries = entries.Where(e => e.State == EntityState.Added).ToList();
+    var entries = ChangeTracker.Entries()
+        .Where(e => _trackedTables.Contains(e.Entity.GetType().Name)
+                 && e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+        .ToList();
 
-        // ──────── PRE-SAVE: Capture DELETE & UPDATE old values ────────
-        foreach (var entry in entries)
+    var insertEntries = entries.Where(e => e.State == EntityState.Added).ToList();
+
+    foreach (var entry in entries)
+    {
+        var tableName = entry.Entity.GetType().Name;
+
+        if (entry.State == EntityState.Deleted)
         {
-            var tableName = entry.Entity.GetType().Name;
-
-            if (entry.State == EntityState.Deleted)
-            {
-                var oldValues = GetPropertyValues(entry, EntityState.Deleted);
-                var recordId = GetPrimaryKeyValue(entry);
-
-                auditEntries.Add(new AuditLog
-                {
-                    TableName = tableName,
-                    RecordId = recordId,
-                    ActionType = "DELETE",
-                    OldValue = SerializeDict(oldValues),
-                    NewValue = null,
-                    ChangedBy = userName,
-                    ChangedAt = DateTime.UtcNow,
-                    IpAddress = ipAddress,
-                    AppModule = "EF_AutoAudit"
-                });
-            }
-            else if (entry.State == EntityState.Modified)
-            {
-                var oldValues = new Dictionary<string, object?>();
-                var newValues = new Dictionary<string, object?>();
-                var changedColumns = new List<string>();
-
-                foreach (var prop in entry.Properties)
-                {
-                    if (_ignoredProperties.Contains(prop.Metadata.Name)) continue;
-                    if (prop.Metadata.IsPrimaryKey()) continue;
-
-                    if (prop.IsModified && !Equals(prop.OriginalValue, prop.CurrentValue))
-                    {
-                        oldValues[prop.Metadata.Name] = prop.OriginalValue;
-                        newValues[prop.Metadata.Name] = prop.CurrentValue;
-                        changedColumns.Add(prop.Metadata.Name);
-                    }
-                }
-
-                if (changedColumns.Count > 0)
-                {
-                    var recordId = GetPrimaryKeyValue(entry);
-
-                    auditEntries.Add(new AuditLog
-                    {
-                        TableName = tableName,
-                        RecordId = recordId,
-                        ActionType = "UPDATE",
-                        ColumnChanged = string.Join(", ", changedColumns),
-                        OldValue = SerializeDict(oldValues),
-                        NewValue = SerializeDict(newValues),
-                        ChangedBy = userName,
-                        ChangedAt = DateTime.UtcNow,
-                        IpAddress = ipAddress,
-                        AppModule = "EF_AutoAudit"
-                    });
-                }
-            }
-        }
-
-        // ──────── SAVE actual changes to database ────────
-        var result = await base.SaveChangesAsync(cancellationToken);
-
-        // ──────── POST-SAVE: Capture INSERT new values (now keys are generated) ────────
-        foreach (var entry in insertEntries)
-        {
-            var tableName = entry.Entity.GetType().Name;
-            var recordId = GetPrimaryKeyValue(entry); // Now has the DB-generated key
-            var newValues = GetPropertyValues(entry, EntityState.Added);
-
             auditEntries.Add(new AuditLog
             {
                 TableName = tableName,
-                RecordId = recordId,
-                ActionType = "INSERT",
-                OldValue = null,
-                NewValue = SerializeDict(newValues),
+                RecordId = GetPrimaryKeyValue(entry),
+                ActionType = "DELETE",
+                OldValue = SerializeDict(GetPropertyValues(entry, EntityState.Deleted)),
                 ChangedBy = userName,
                 ChangedAt = DateTime.UtcNow,
                 IpAddress = ipAddress,
                 AppModule = "EF_AutoAudit"
             });
         }
-
-        // ──────── Persist audit logs ────────
-        if (auditEntries.Count > 0)
-        {
-            AuditLogs.AddRange(auditEntries);
-            await base.SaveChangesAsync(cancellationToken);
-        }
-
-        if (startedTx)
-            await Database.CommitTransactionAsync(cancellationToken);
-
-        return result;
     }
+
+    var result = await base.SaveChangesAsync(cancellationToken);
+
+    foreach (var entry in insertEntries)
+    {
+        auditEntries.Add(new AuditLog
+        {
+            TableName = entry.Entity.GetType().Name,
+            RecordId = GetPrimaryKeyValue(entry),
+            ActionType = "INSERT",
+            NewValue = SerializeDict(GetPropertyValues(entry, EntityState.Added)),
+            ChangedBy = userName,
+            ChangedAt = DateTime.UtcNow,
+            IpAddress = ipAddress,
+            AppModule = "EF_AutoAudit"
+        });
+    }
+
+    if (auditEntries.Count > 0)
+    {
+        AuditLogs.AddRange(auditEntries);
+        await base.SaveChangesAsync(cancellationToken);
+    }
+
+    if (Database.CurrentTransaction != null)
+        await Database.CommitTransactionAsync(cancellationToken);
+
+    return result;
+}
 
     private static string GetPrimaryKeyValue(EntityEntry entry)
     {

@@ -57,9 +57,17 @@ TemporaryDependencyNodeTargetIdentifier=net8.0
 Controllers/
  AccountControllerTests.cs
  BusinessLogicHardeningTests.cs
+ CategoriesControllerTests.cs
  HomeControllerTests.cs
  ItemsControllerTests.cs
+ OperationsControllerTests.cs
+ PartnersControllerTests.cs
+ ReportsControllerTests.cs
+ SystemControllerTests.cs
  UnitTest1.cs
+ UsersControllerTests.cs
+ VouchersControllerTests.cs
+ WarehousesControllerTests.cs
 obj/Debug/net8.0/
  .NETCoreApp,Version=v8.0.AssemblyAttributes.cs
  WMS.Tests.AssemblyInfo.cs
