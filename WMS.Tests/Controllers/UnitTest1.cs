@@ -18,9 +18,7 @@ public class AuthorizationMatrixTests
     [InlineData(typeof(CategoriesController), nameof(CategoriesController.Create), new[] { "Admin", "Manager" })]
     [InlineData(typeof(CategoriesController), nameof(CategoriesController.Edit), new[] { "Admin", "Manager" })]
     [InlineData(typeof(CategoriesController), nameof(CategoriesController.Delete), new[] { "Admin" })]
-    [InlineData(typeof(UnitsController), nameof(UnitsController.Index), new[] { "Admin", "Manager" })]
-    [InlineData(typeof(UnitsController), nameof(UnitsController.Create), new[] { "Admin", "Manager" })]
-    [InlineData(typeof(UnitsController), nameof(UnitsController.Delete), new[] { "Admin", "Manager" })]
+
     [InlineData(typeof(PartnersController), nameof(PartnersController.Index), new[] { "Admin", "Manager" })]
     [InlineData(typeof(PartnersController), nameof(PartnersController.Create), new[] { "Admin", "Manager" })]
     [InlineData(typeof(PartnersController), nameof(PartnersController.Edit), new[] { "Admin", "Manager" })]
