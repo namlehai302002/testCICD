@@ -58,6 +58,7 @@ Controllers/
  AccountControllerTests.cs
  BusinessLogicHardeningTests.cs
  HomeControllerTests.cs
+ ItemsControllerTests.cs
  UnitTest1.cs
 obj/Debug/net8.0/
  .NETCoreApp,Version=v8.0.AssemblyAttributes.cs
