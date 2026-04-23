@@ -62,7 +62,6 @@ Controllers/
  ItemsControllerTests.cs
  OperationsControllerTests.cs
  PartnersControllerTests.cs
- ReportsControllerTests.cs
  SystemControllerTests.cs
  UnitTest1.cs
  UsersControllerTests.cs

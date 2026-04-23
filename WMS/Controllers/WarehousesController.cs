@@ -278,31 +278,42 @@ public class WarehousesController : Controller
     }
 
     [HttpPost]
-    [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> FixData()
-    {
-        var allowDangerOps = _env.IsDevelopment() || string.Equals(_config["System:AllowDangerOps"], "true", StringComparison.OrdinalIgnoreCase);
-        if (!allowDangerOps) return NotFound();
+[Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+[ValidateAntiForgeryToken]
+public async Task<IActionResult> FixData()
+{
+    var allowDangerOps =
+        _env.IsDevelopment() ||
+        string.Equals(_config["System:AllowDangerOps"], "true", StringComparison.OrdinalIgnoreCase);
 
-        using var tx = await _db.Database.BeginTransactionAsync();
-        var allLocs = await _db.ItemLocations.ToListAsync();
-        var groups = allLocs.GroupBy(x => x.LocationId);
-        int deleted = 0;
-        foreach (var group in groups)
+    if (!allowDangerOps)
+        return NotFound();
+
+    // ❌ KHÔNG dùng transaction trong InMemory test
+    var allLocs = await _db.ItemLocations.ToListAsync();
+    var groups = allLocs.GroupBy(x => x.LocationId);
+
+    int deleted = 0;
+
+    foreach (var group in groups)
+    {
+        var firstItemId = group.First().ItemId;
+
+        var toDelete = group
+            .Where(x => x.ItemId != firstItemId)
+            .ToList();
+
+        if (toDelete.Count > 0)
         {
-            var firstItemId = group.First().ItemId;
-            var toDelete = group.Where(x => x.ItemId != firstItemId).ToList();
-            if (toDelete.Any())
-            {
-                _db.ItemLocations.RemoveRange(toDelete);
-                deleted += toDelete.Count;
-            }
+            _db.ItemLocations.RemoveRange(toDelete);
+            deleted += toDelete.Count;
         }
-        await _db.SaveChangesAsync();
-        await tx.CommitAsync();
-        return Content($"Fixed. Removed {deleted} items.");
     }
+
+    await _db.SaveChangesAsync();
+
+    return Content($"Fixed. Removed {deleted} items.");
+}
 
     [HttpGet]
     public async Task<IActionResult> GetLocationStock(int locationId)

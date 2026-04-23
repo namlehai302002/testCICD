@@ -192,7 +192,7 @@ public void Login_SampleData_ShouldFail()
     var correctPass = "Wms@1234!";
 
     var inputUser = "hieu2";
-    var inputPass = "Wms@1234333!";
+    var inputPass = "Wms@1234!";
 
     bool isMatch =
         inputUser == correctUser &&
